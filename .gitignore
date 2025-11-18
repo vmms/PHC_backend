@@ -1,1 +1,39 @@
 notas.txt
+
+# Entorno virtual
+env/
+venv/
+.venv/
+
+# Archivos de Python compilados
+*.pyc
+*.pyo
+__pycache__/
+
+# Configuración local de Django
+*.sqlite3
+db.sqlite3
+local_settings.py
+
+# Archivos de migraciones que no quieres subir (opcional)
+*/migrations/*.py
+!*/migrations/__init__.py
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de logs
+*.log
+
+# Configuración de IDEs
+.vscode/
+.idea/
+
+# Archivos estáticos compilados (si usas collectstatic)
+staticfiles/
+
+# Otros temporales
+*.env
+*.bak
+*.swp

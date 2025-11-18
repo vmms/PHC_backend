@@ -1,0 +1,322 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Accounts API",
+    "version": "1.0.0",
+    "description": "Endpoints para manejar cuentas de usuario"
+  },
+  "paths": {
+    "/accounts/list/": {
+      "get": {
+        "tags": ["Accounts"],
+        "summary": "Listar cuentas",
+        "description": "Retorna todas las cuentas registradas. Requiere autenticación.",
+        "responses": {
+          "200": {
+            "description": "Lista de cuentas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  }
+                },
+                "examples": {
+                  "Ejemplo": {
+                    "value": [
+                      {
+                        "id_account": 1,
+                        "user": "usuario1",
+                        "password": "********",
+                        "subscription": "basic"
+                      },
+                      {
+                        "id_account": 2,
+                        "user": "usuario2",
+                        "password": "********",
+                        "subscription": "premium"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/create/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Crear cuenta",
+        "description": "Crea un nuevo registro en la tabla Account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Account" },
+              "examples": {
+                "Ejemplo": {
+                  "value": {
+                    "user": "nuevo_user",
+                    "password": "123456",
+                    "subscription": "basic"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta creada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Account" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/read/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Leer cuenta(s)",
+        "description": "Retorna una cuenta específica si se envía `id_account`, o todas si no se envía.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id_account": { "type": "integer", "description": "ID de la cuenta a consultar" }
+                }
+              },
+              "examples": {
+                "Ejemplo": {
+                  "value": { "id_account": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Información de la(s) cuenta(s)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/Account" },
+                    { "type": "array", "items": { "$ref": "#/components/schemas/Account" } }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": { "value": { "code": 0, "message": "Account not found" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/update/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Actualizar cuenta",
+        "description": "Actualiza una cuenta existente mediante `id_account`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Account" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta actualizada",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Account" } }
+            }
+          },
+          "404": {
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/delete/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Eliminar cuenta",
+        "description": "Elimina una cuenta mediante `id_account`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "id_account": { "type": "integer" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Eliminación exitosa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "message": { "type": "string" } },
+                  "example": { "message": "Account deleted successfully" }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/token_login/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Login con token JWT",
+        "description": "Endpoint de autenticación manual. Recibe usuario y contraseña y devuelve tokens JWT.\nFlujo de respuesta:\n- Valida usuario y contraseña\n- Genera access token (1 hora)\n- Genera refresh token (7 días)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TokenLoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Acceso permitido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenLoginResponse" },
+                "examples": {
+                  "Ejemplo": {
+                    "value": {
+                      "code": 1,
+                      "message": "Acceso permitido",
+                      "refresh": "xxxxx.yyyyy.zzzzz",
+                      "access": "xxxxx.yyyyy.zzzzz",
+                      "id_account": 1,
+                      "user": "testuser",
+                      "subscription": "basic"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Faltan datos",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": {
+                    "value": { "code": 0, "message": "Se requiere usuario y contraseña" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Contraseña incorrecta",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": {
+                    "value": { "code": 0, "message": "Contraseña incorrecta" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": {
+                    "value": { "code": 0, "message": "Usuario no encontrado" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id_account": { "type": "integer" },
+          "user": { "type": "string" },
+          "password": { "type": "string" },
+          "subscription": { "type": "string" }
+        },
+        "required": ["user", "password", "subscription"]
+      },
+      "TokenLoginRequest": {
+        "type": "object",
+        "properties": {
+          "user": { "type": "string" },
+          "password": { "type": "string" }
+        },
+        "required": ["user", "password"]
+      },
+      "TokenLoginResponse": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer" },
+          "message": { "type": "string" },
+          "refresh": { "type": "string" },
+          "access": { "type": "string" },
+          "id_account": { "type": "integer" },
+          "user": { "type": "string" },
+          "subscription": { "type": "string" }
+        },
+        "required": ["code","message","refresh","access","id_account","user","subscription"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer" },
+          "message": { "type": "string" }
+        },
+        "required": ["code", "message"]
+      }
+    }
+  }
+}

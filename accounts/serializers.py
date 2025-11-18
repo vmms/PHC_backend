@@ -30,3 +30,32 @@ class AccountLoginSerializer(serializers.Serializer):
 
         data['account'] = account
         return data
+
+class TokenLoginRequestSerializer(serializers.Serializer):
+    user = serializers.CharField()
+    password = serializers.CharField()
+
+    class Meta:
+        ref_name = "TokenLoginRequest"
+
+
+class TokenLoginResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    refresh = serializers.CharField()
+    access = serializers.CharField()
+    id_account = serializers.IntegerField()
+    user = serializers.CharField()
+    subscription = serializers.CharField()
+
+    class Meta:
+        ref_name = "TokenLoginResponse"
+
+class ErrorResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+
+    class Meta:
+        ref_name = "ErrorResponse"
+
+

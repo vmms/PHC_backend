@@ -6,12 +6,14 @@ from rest_framework.response import Response
 from .models import Company
 from .serializers import CompanySerializer
 
+
 @api_view(['GET'])
 def list_companies(request):
     """Lista todas las compañías registradas"""
     companies = Company.objects.all()
     serializer = CompanySerializer(companies, many=True)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -27,6 +29,7 @@ def get_company(request):
     except Company.DoesNotExist:
         return Response({'message': 'No company associated with this user'}, status=404)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_company(request):
@@ -36,6 +39,7 @@ def create_company(request):
         serializer.save(account=request.user)
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
+
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])

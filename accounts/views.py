@@ -3,12 +3,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Account
-from .serializers import AccountSerializer
+from .serializers import AccountSerializer, TokenLoginRequestSerializer, TokenLoginResponseSerializer, ErrorResponseSerializer
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from datetime import timedelta
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -63,7 +64,6 @@ def update_account(request):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['POST'])
 def delete_account(request):
     id_account = request.data.get("id_account")
@@ -77,6 +77,7 @@ def delete_account(request):
 
     account.delete()
     return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 @permission_classes([])
@@ -93,7 +94,7 @@ def token_login(request):
         return Response({"code": 0, "message": "Usuario no encontrado"}, status=404)
 
     if account.password != password:
-        return Response({"code": 0, "message": "Contraseña incorrecta"}, status=400)
+        return Response({"code": 0, "message": "Contraseña incorrecta"}, status=401)
 
     # --- CREAR TOKENS MANUALMENTE ---
     # Refresh token con expiración (por ejemplo 7 días)

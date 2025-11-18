@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: PHC API
+  version: 1.0.0
+  description: Documentación automática de los endpoints del sistema.
+paths:
+  /api/accounts/create/:
+    post:
+      operationId: accounts_create_create
+      description: Crea un nuevo registro en la tabla Account.
+      summary: Crear una cuenta nueva
+      tags:
+      - accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Account'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Account'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+  /api/accounts/delete/:
+    post:
+      operationId: accounts_delete_create
+      description: Elimina una cuenta mediante `id_account`.
+      summary: Eliminar cuenta
+      parameters:
+      - in: query
+        name: id_account
+        schema:
+          type: integer
+        description: ID de la cuenta a eliminar
+        required: true
+      tags:
+      - accounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/accounts/list/:
+    get:
+      operationId: accounts_list_list
+      description: Retorna todas las cuentas registradas. Requiere autenticación.
+      summary: Listar cuentas
+      tags:
+      - accounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+          description: ''
+  /api/accounts/read/:
+    post:
+      operationId: accounts_read_create
+      description: Si envías `id_account`, devuelve solo ese registro. Si no envías
+        nada, devuelve todas las cuentas.
+      summary: Leer una cuenta o todas
+      parameters:
+      - in: query
+        name: id_account
+        schema:
+          type: integer
+        description: ID de la cuenta a consultar
+      tags:
+      - accounts
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+  /api/accounts/token/:
+    post:
+      operationId: accounts_token_create
+      description: |-
+        Endpoint de autenticación manual. Recibe usuario y contraseña y devuelve tokens JWT.
+
+        ### Flujo de respuesta:
+        - Valida usuario y contraseña
+        - Genera access token (1 hora)
+        - Genera refresh token (7 días)
+      summary: Login con token JWT
+      tags:
+      - accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenLoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenLoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenLoginRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenLoginResponse'
+              examples:
+                LoginCorrecto:
+                  value:
+                    code: 1
+                    message: Acceso permitido
+                    refresh: xxxxx.yyyyy.zzzzz
+                    access: xxxxx.yyyyy.zzzzz
+                    id_account: 1
+                    user: testuser
+                    subscription: basic
+                  summary: Login correcto
+          description: Acceso permitido
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                FaltanDatos:
+                  value:
+                    code: 0
+                    message: Se requiere usuario y contraseña
+                  summary: Faltan datos
+          description: Faltan datos
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                ContraseñaIncorrecta:
+                  value:
+                    code: 0
+                    message: Contraseña incorrecta
+                  summary: Contraseña incorrecta
+          description: Contraseña incorrecta
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                UsuarioNoEncontrado:
+                  value:
+                    code: 0
+                    message: Usuario no encontrado
+                  summary: Usuario no encontrado
+          description: Usuario no encontrado
+  /api/accounts/update/:
+    post:
+      operationId: accounts_update_create
+      description: Actualiza una cuenta existente mediante `id_account`.
+      summary: Actualizar una cuenta
+      tags:
+      - accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Account'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Account'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+  /api/addresses/addresses/:
+    get:
+      operationId: addresses_addresses_list
+      tags:
+      - addresses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+          description: ''
+    post:
+      operationId: addresses_addresses_create
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Address'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Address'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Address'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+          description: ''
+  /api/addresses/addresses/{id_address}/:
+    get:
+      operationId: addresses_addresses_retrieve
+      parameters:
+      - in: path
+        name: id_address
+        schema:
+          type: integer
+        description: A unique integer value identifying this address.
+        required: true
+      tags:
+      - addresses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+          description: ''
+    put:
+      operationId: addresses_addresses_update
+      parameters:
+      - in: path
+        name: id_address
+        schema:
+          type: integer
+        description: A unique integer value identifying this address.
+        required: true
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Address'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Address'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Address'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+          description: ''
+    patch:
+      operationId: addresses_addresses_partial_update
+      parameters:
+      - in: path
+        name: id_address
+        schema:
+          type: integer
+        description: A unique integer value identifying this address.
+        required: true
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAddress'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAddress'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAddress'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+          description: ''
+    delete:
+      operationId: addresses_addresses_destroy
+      parameters:
+      - in: path
+        name: id_address
+        schema:
+          type: integer
+        description: A unique integer value identifying this address.
+        required: true
+      tags:
+      - addresses
+      responses:
+        '204':
+          description: No response body
+  /api/companies/:
+    get:
+      operationId: companies_list
+      description: Devuelve todas las compañías registradas en el sistema.
+      summary: Listar compañías
+      tags:
+      - companies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Company'
+          description: ''
+  /api/companies/create/:
+    post:
+      operationId: companies_create_create
+      summary: Crear compañía
+      tags:
+      - companies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Company'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Company'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+          description: ''
+        '400':
+          description: Invalid data
+  /api/companies/delete/{id}/:
+    delete:
+      operationId: companies_delete_destroy
+      description: Elimina la compañía especificada por ID.
+      summary: Eliminar compañía
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - companies
+      responses:
+        '200':
+          description: Company deleted successfully
+        '404':
+          description: Company not found
+  /api/companies/getcompany/:
+    get:
+      operationId: companies_getcompany_retrieve
+      description: Devuelve la compañía asociada al usuario autenticado mediante el
+        token.
+      summary: Obtener compañía del usuario autenticado
+      tags:
+      - companies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+          description: ''
+        '404':
+          description: No company associated with this user
+  /api/companies/update/:
+    put:
+      operationId: companies_update_update
+      description: |-
+        Actualiza la compañía asociada al usuario autenticado.
+        Si no existe, devuelve un mensaje de error.
+      summary: Actualizar compañía del usuario autenticado
+      tags:
+      - companies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Company'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Company'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+          description: ''
+        '404':
+          description: No company associated with this user
+components:
+  schemas:
+    Account:
+      type: object
+      properties:
+        id_account:
+          type: integer
+          readOnly: true
+        status:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        user:
+          type: string
+          maxLength: 45
+        password:
+          type: string
+          maxLength: 100
+        subscription:
+          type: string
+          maxLength: 45
+      required:
+      - id_account
+      - password
+      - status
+      - subscription
+      - user
+    Address:
+      type: object
+      properties:
+        id_address:
+          type: integer
+          readOnly: true
+        street:
+          type: string
+          nullable: true
+          maxLength: 100
+        state:
+          type: string
+          nullable: true
+          maxLength: 45
+        zip_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        country:
+          type: string
+          nullable: true
+          maxLength: 45
+      required:
+      - id_address
+    Company:
+      type: object
+      properties:
+        id_company:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        account:
+          type: integer
+          readOnly: true
+        address:
+          $ref: '#/components/schemas/Address'
+        primary_contact:
+          type: string
+          maxLength: 45
+        title_pc:
+          type: string
+          maxLength: 45
+        phone_number_pc:
+          type: string
+          maxLength: 20
+        email_pc:
+          type: string
+          format: email
+          maxLength: 100
+        secondary_contact:
+          type: string
+          nullable: true
+          maxLength: 45
+        title_sc:
+          type: string
+          nullable: true
+          maxLength: 45
+        phone_number_sc:
+          type: string
+          nullable: true
+          maxLength: 20
+        email_sc:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        link:
+          type: string
+          maxLength: 100
+      required:
+      - account
+      - address
+      - description
+      - email_pc
+      - id_company
+      - link
+      - name
+      - phone_number_pc
+      - primary_contact
+      - title_pc
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      required:
+      - code
+      - message
+    PatchedAddress:
+      type: object
+      properties:
+        id_address:
+          type: integer
+          readOnly: true
+        street:
+          type: string
+          nullable: true
+          maxLength: 100
+        state:
+          type: string
+          nullable: true
+          maxLength: 45
+        zip_code:
+          type: string
+          nullable: true
+          maxLength: 10
+        country:
+          type: string
+          nullable: true
+          maxLength: 45
+    TokenLoginRequest:
+      type: object
+      properties:
+        user:
+          type: string
+        password:
+          type: string
+      required:
+      - password
+      - user
+    TokenLoginResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        refresh:
+          type: string
+        access:
+          type: string
+        id_account:
+          type: integer
+        user:
+          type: string
+        subscription:
+          type: string
+      required:
+      - access
+      - code
+      - id_account
+      - message
+      - refresh
+      - subscription
+      - user
