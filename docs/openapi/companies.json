@@ -1,0 +1,245 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Companies API",
+    "version": "1.0.0",
+    "description": "Endpoints para manejar compañías"
+  },
+  "tags": [
+    {
+      "name": "Companies",
+      "description": "Operaciones relacionadas con compañías"
+    }
+  ],
+  "paths": {
+    "/companies/list/": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "Listar compañías",
+        "description": "Lista todas las compañías registradas",
+        "responses": {
+          "200": {
+            "description": "Lista de compañías",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Company"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/get/": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "Obtener compañía del usuario",
+        "description": "Devuelve la compañía asociada al usuario autenticado",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Compañía encontrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No hay compañía asociada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "No company associated with this user"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/create/": {
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Crear compañía",
+        "description": "Crea una nueva compañía para el usuario autenticado",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CompanyCreateRequest"},
+              "example": {
+                "name": "Mi Compañía",
+                "address": "Calle 123",
+                "phone": "555-1234"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Compañía creada",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Company"}
+              }
+            }
+          },
+          "400": {
+            "description": "Error en los datos",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/update/": {
+      "put": {
+        "tags": ["Companies"],
+        "summary": "Actualizar compañía",
+        "description": "Actualiza la compañía asociada al usuario autenticado",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CompanyUpdateRequest"},
+              "example": {
+                "name": "Mi Compañía Actualizada",
+                "address": "Calle 456",
+                "phone": "555-5678"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compañía actualizada",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Company"}
+              }
+            }
+          },
+          "404": {
+            "description": "No hay compañía asociada",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"},
+                "example": {
+                  "message": "No company associated with this user"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error en los datos",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/delete/{pk}/": {
+      "delete": {
+        "tags": ["Companies"],
+        "summary": "Eliminar compañía",
+        "description": "Elimina una compañía por su ID",
+        "parameters": [
+          {
+            "name": "pk",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID de la compañía a eliminar"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compañía eliminada",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object", "properties": {"message": {"type": "string"}}},
+                "example": {"message": "Company deleted successfully"}
+              }
+            }
+          },
+          "404": {
+            "description": "Compañía no encontrada",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"},
+                "example": {"message": "Company not found"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Company": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "address": {"type": "string"},
+          "phone": {"type": "string"},
+          "account": {"type": "integer"}
+        },
+        "required": ["name", "address", "phone"]
+      },
+      "CompanyCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "address": {"type": "string"},
+          "phone": {"type": "string"}
+        },
+        "required": ["name", "address", "phone"]
+      },
+      "CompanyUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "address": {"type": "string"},
+          "phone": {"type": "string"}
+        },
+        "required": ["name", "address", "phone"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {"type": "string"}
+        },
+        "required": ["message"]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
