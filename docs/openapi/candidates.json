@@ -1,0 +1,310 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Candidates API",
+    "version": "1.0.0",
+    "description": "Endpoints para manejar Candidates asociados a cuentas de usuario."
+  },
+  "paths": {
+    "/candidates/get/": {
+      "get": {
+        "tags": ["Candidates"],
+        "summary": "Obtener Candidate del usuario autenticado",
+        "description": "Devuelve el candidate asociado al usuario autenticado.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate del usuario",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Candidate" }
+              }
+            }
+          },
+          "404": {
+            "description": "Candidate no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": {
+                  "message": "No candidate associated with this user"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/candidates/create/": {
+      "post": {
+        "tags": ["Candidates"],
+        "summary": "Crear Candidate",
+        "description": "Crea un candidate asociado al usuario autenticado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CandidateInput" }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Candidate creado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Candidate" }
+              }
+            }
+          },
+          "404": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/candidates/update/": {
+      "put": {
+        "tags": ["Candidates"],
+        "summary": "Actualizar Candidate",
+        "description": "Actualiza el candidate asociado al usuario autenticado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Candidate" }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate actualizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Candidate" }
+              }
+            }
+          },
+          "400": {
+            "description": "Candidate no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": {
+                  "message": "Bad request"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Candidate no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": {
+                  "message": "No candidate associated with this user"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/candidates/delete/": {
+      "delete": {
+        "tags": ["Candidates"],
+        "summary": "Eliminar Candidate",
+        "description": "Elimina el candidate asociado al usuario autenticado.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidate eliminado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Message" },
+                "example": {
+                  "message": "Candidate deleted successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Candidate no encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": {
+                  "message": "No candidate associated with this user"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/candidates/list/": {
+      "get": {
+        "tags": ["Candidates"],
+        "summary": "Listar Candidates",
+        "description": "Lista todos los candidates (solo debugging/admin).",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de candidates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Candidate" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "Candidate": {
+        "type": "object",
+        "properties": {
+          "id_candidate": { "type": "integer" },
+          "account": { "type": "integer", "description": "ID del usuario propietario" },
+
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "phone_number": { "type": "string" },
+
+          "address": {
+            "type": "object",
+            "properties": {
+              "id_address": { "type": "integer" },
+              "street": { "type": "string" },
+              "state": { "type": "string" },
+              "zip_code": { "type": "string" },
+              "country": { "type": "string" }
+            }
+          },
+
+          "education": {
+            "type": "object",
+            "properties": {
+              "id_education": { "type": "integer" },
+              "country": { "type": "string" },
+              "education": { "type": "string" },
+              "graduation_year": { "type": "string" },
+              "institute": { "type": "string" }
+            }
+          },
+
+          "status": { "type": "string" },
+          "radius": { "type": "integer" },
+          "adult": { "type": "boolean" },
+          "work_permission": { "type": "boolean" },
+          "web_link": { "type": "string" },
+          "about": { "type": "string" }
+        }
+      },
+      "CandidateInput": {
+        "type": "object",
+        "properties": {
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" }
+        },
+        "required": ["first_name", "last_name", "email", "phone"]
+      },
+
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      },
+
+      "Message": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    },
+
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

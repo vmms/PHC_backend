@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'messages_app',
     'api',
     'addresses',
+    'education',
 ]
 
 REST_FRAMEWORK = {

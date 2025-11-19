@@ -17,10 +17,11 @@ def list_accounts(request):
     """Lista todos los usuarios registrados en la tabla account"""
     accounts = Account.objects.all()
     serializer = AccountSerializer(accounts, many=True)
-    return Response(serializer.data)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
+@permission_classes([])
 def create_account(request):
     serializer = AccountSerializer(data=request.data)
     if serializer.is_valid():

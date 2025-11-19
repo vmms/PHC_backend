@@ -10,7 +10,19 @@
       "get": {
         "tags": ["Accounts"],
         "summary": "Listar cuentas",
-        "description": "Retorna todas las cuentas registradas. Requiere autenticación.",
+        "description": "Lista todos los usuarios registrados en la tabla account. Requiere autenticación.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lista de cuentas",
@@ -50,7 +62,7 @@
       "post": {
         "tags": ["Accounts"],
         "summary": "Crear cuenta",
-        "description": "Crea un nuevo registro en la tabla Account.",
+        "description": "Crea un nueva cuenta y la almacena en la tabla Account.",
         "requestBody": {
           "required": true,
           "content": {
@@ -61,7 +73,8 @@
                   "value": {
                     "user": "nuevo_user",
                     "password": "123456",
-                    "subscription": "basic"
+                    "subscription": "basic",
+                    "status": 1
                   }
                 }
               }
@@ -76,6 +89,14 @@
                 "schema": { "$ref": "#/components/schemas/Account" }
               }
             }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
           }
         }
       }
@@ -86,19 +107,12 @@
         "summary": "Leer cuenta(s)",
         "description": "Retorna una cuenta específica si se envía `id_account`, o todas si no se envía.",
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {
-                  "id_account": { "type": "integer", "description": "ID de la cuenta a consultar" }
-                }
-              },
-              "examples": {
-                "Ejemplo": {
-                  "value": { "id_account": 1 }
-                }
+                "properties": { "id_account": { "type": "integer" } }
               }
             }
           }
@@ -277,11 +291,19 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
       "Account": {
         "type": "object",
         "properties": {
           "id_account": { "type": "integer" },
+          "status": { "type": "integer" },
           "user": { "type": "string" },
           "password": { "type": "string" },
           "subscription": { "type": "string" }
