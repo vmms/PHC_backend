@@ -59,6 +59,9 @@ INSTALLED_APPS = [
     'api',
     'addresses',
     'education',
+    'jobs',
+    'skills',
+    'schedulers',
 ]
 
 REST_FRAMEWORK = {

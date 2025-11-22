@@ -31,21 +31,22 @@ def create_account(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def read_account(request):
-    """Permite leer uno o todos los registros"""
-    id_account = request.data.get("id_account")
+    user = request.user.user 
 
-    if id_account:
-        try:
-            account = Account.objects.get(id_account=id_account)
-            serializer = AccountSerializer(account)
-            return Response(serializer.data)
-        except Account.DoesNotExist:
-            return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
-    else:
-        accounts = Account.objects.all()
-        serializer = AccountSerializer(accounts, many=True)
-        return Response(serializer.data)
+    try:
+        account = Account.objects.get(user=user)
+    except Account.DoesNotExist:
+        return Response(
+            {"error": "Account not found for this user"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = AccountSerializer(account)
+    return Response(serializer.data)
+
+
 
 
 @api_view(['POST'])

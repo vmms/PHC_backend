@@ -1,0 +1,245 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Jobs API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/jobs/list/": {
+      "get": {
+        "summary": "Listar jobs activos",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Lista de jobs activos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Job" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/jobs/get/": {
+      "post": {
+        "summary": "Obtener un job por ID",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id_jobs": { "type": "integer" }
+                },
+                "required": ["id_jobs"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobDetail" }
+              }
+            }
+          },
+          "404": {
+            "description": "Job no encontrado"
+          }
+        }
+      }
+    },
+
+    "/api/jobs/create/": {
+      "post": {
+        "summary": "Crear un job",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JobCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job creado correctamente",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/JobDetail" } }
+            }
+          },
+          "404": {
+            "description": "Error de validación"
+          }
+        }
+      }
+    },
+
+    "/api/jobs/update/": {
+      "post": {
+        "summary": "Actualizar job",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JobUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job actualizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Job" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/jobs/delete/": {
+      "post": {
+        "summary": "Eliminar job",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id_jobs": { "type": "integer" }
+                },
+                "required": ["id_jobs"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job eliminado"
+          }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id_jobs": { "type": "integer" },
+          "title": { "type": "string" },
+          "type": { "type": "string" },
+          "location": { "type": "string" },
+          "salary": { "type": "string" },
+          "experience": { "type": "string" },
+          "schedule_type": { "type": "string" },
+          "employment_type": { "type": "string" },
+          "modality": { "type": "string" },
+          "is_active": { "type": "boolean" },
+          "day_start": { "type": "string", "format": "date" }
+        }
+      },
+
+      "JobDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Job" },
+          {
+            "type": "object",
+            "properties": {
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id_skills": { "type": "integer" },
+                    "name": { "type": "string" }
+                  }
+                }
+              },
+              "schedule": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": { "type": "string" },
+                    "time_start": { "type": "string" },
+                    "time_finish": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+
+      "JobCreate": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "type": { "type": "string" },
+          "location": { "type": "string" },
+          "salary": { "type": "string" },
+          "experience": { "type": "string" },
+          "schedule_type": { "type": "string" },
+          "employment_type": { "type": "string" },
+          "modality": { "type": "string" },
+          "benefits": { "type": "string" },
+          "requirements": { "type": "string" },
+          "day_start": { "type": "string", "format": "date" },
+          "description": { "type": "string" },
+          "max_applications": { "type": "integer" },
+          "auto_close": { "type": "boolean" },
+          "work_mode": { "type": "string" },
+          "contract_type": { "type": "string" },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "id_skills": { "type": "integer" } }
+            }
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": { "type": "string" },
+                "time_start": { "type": "string" },
+                "time_finish": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+
+      "JobUpdate": {
+        "type": "object",
+        "properties": {
+          "id_jobs": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
