@@ -2,21 +2,56 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Jobs API",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": "**API para la gestión de JOBS.**\n\nIncluye autenticación con JWT, validación de datos y respuestas estandarizadas."
   },
   "paths": {
     "/api/jobs/list/": {
       "get": {
         "summary": "Listar jobs activos",
+        "description": "Lista todos jobs del usuario que se autentifico y recibio un `token` valido. Requiere autenticación.",
         "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token SJWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Lista de jobs activos",
+            "description": "Lista de jobs activos del usuario.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/Job" }
+                "schema": {  "$ref": "#/components/schemas/Job" 
+                },
+                "example": {
+                  "id_jobs": 1,
+                  "company_id": 1,
+                  "type": "Full-time",
+                  "title": "Senior Backend Developer",
+                  "location": "Remote / San Diego, CA",
+                  "salary": "50000-70000",
+                  "experience": "3+ years",
+                  "schedule_type": "Day",
+                  "employment_type": "Permanent",
+                  "modality": "Onsite",
+                  "benefits": "Health insurance, 401k",
+                  "requirements": "Django, REST, Postgres",
+                  "day_start": "2025-12-01",
+                  "description": "Desarrollo y mantenimiento de APIs.",
+                  "is_active": true,
+                  "created_at": "2025-11-23T12:34:56Z",
+                  "updated_at": "2025-11-23T12:34:56Z",
+                  "max_applications": 100,
+                  "auto_close": false,
+                  "work_mode": "hybrid",
+                  "contract_type": "indefinido"
                 }
               }
             }
@@ -29,6 +64,18 @@
       "post": {
         "summary": "Obtener un job por ID",
         "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -48,12 +95,20 @@
             "description": "Job encontrado",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/JobDetail" }
+                "schema": { "$ref": "#/components/schemas/JobGetResponse" }
               }
             }
           },
           "404": {
-            "description": "Job no encontrado"
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": { "value": { "code": 0, "message": "Account not found" } }
+                }
+              }
+            }
           }
         }
       }
@@ -63,6 +118,19 @@
       "post": {
         "summary": "Crear un job",
         "security": [{ "BearerAuth": [] }],
+        "description": "Este método permite crear un Job nuevo para ser publicado. Requiere autenticación mediante un `token` valido.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -75,11 +143,19 @@
           "201": {
             "description": "Job creado correctamente",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/JobDetail" } }
+              "application/json": { "schema": { "$ref": "#/components/schemas/JobCreateResponse" } }
             }
           },
           "404": {
-            "description": "Error de validación"
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "Ejemplo": { "value": { "code": 0, "message": "Account not found" } }
+                }
+              }
+            }
           }
         }
       }
@@ -149,19 +225,120 @@
         "type": "object",
         "properties": {
           "id_jobs": { "type": "integer" },
-          "title": { "type": "string" },
+          "company_id": {
+            "type": "integer",
+            "description": "ID de la compañía (company_id)"
+          },
           "type": { "type": "string" },
+          "title": { "type": "string" },
+          "location": { "type": "string" },
+          "salary": { "type": "string" },
+          "experience": { "type": "string" },
+
+          "schedule_type": { "type": "string" },
+          "employment_type": { "type": "string" },
+          "modality": { "type": "string" },
+
+          "benefits": { "type": "string", "nullable": true },
+          "requirements": { "type": "string", "nullable": true },
+
+          "day_start": { "type": "string", "format": "date" },
+          "description": { "type": "string" },
+
+          "is_active": { "type": "boolean" },
+
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+
+          "max_applications": { "type": "integer", "nullable": true },
+          "auto_close": { "type": "boolean" },
+          "work_mode": { "type": "string", "nullable": true },
+          "contract_type": { "type": "string", "nullable": true }
+        },
+        "required": [
+          "id_jobs",
+          "company",
+          "type",
+          "title",
+          "location",
+          "salary",
+          "experience",
+          "schedule_type",
+          "employment_type",
+          "modality",
+          "day_start",
+          "description",
+          "is_active",
+          "created_at",
+          "updated_at",
+          "auto_close"
+        ]
+      },
+      "JobGetResponse": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
           "location": { "type": "string" },
           "salary": { "type": "string" },
           "experience": { "type": "string" },
           "schedule_type": { "type": "string" },
           "employment_type": { "type": "string" },
           "modality": { "type": "string" },
-          "is_active": { "type": "boolean" },
-          "day_start": { "type": "string", "format": "date" }
-        }
-      },
 
+          "benefits": { "type": "string", "nullable": true },
+          "requirements": { "type": "string", "nullable": true },
+
+          "day_start": { "type": "string", "format": "date" },
+          "description": { "type": "string" },
+
+          "is_active": { "type": "boolean" },
+          "max_applications": { "type": "integer", "nullable": true },
+          "auto_close": { "type": "boolean" },
+          "work_mode": { "type": "string", "nullable": true },
+          "contract_type": { "type": "string", "nullable": true },
+
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id_skills": { "type": "integer" },
+                "name": { "type": "string" }
+              }
+            }
+          },
+
+          "schedule": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": { "type": "string" },
+                "time_start": { "type": "string" },
+                "time_finish": { "type": "string" }
+              }
+            }
+          }
+        },
+
+        "required": [
+          "type",
+          "title",
+          "location",
+          "salary",
+          "experience",
+          "schedule_type",
+          "employment_type",
+          "modality",
+          "day_start",
+          "description",
+          "is_active",
+          "auto_close",
+          "skills",
+          "schedule"
+        ]
+      },
       "JobDetail": {
         "allOf": [
           { "$ref": "#/components/schemas/Job" },
@@ -234,11 +411,37 @@
         }
       },
 
+      "JobCreateResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "job": {
+            "type": "object",
+            "properties": {
+              "id_job": { "type": "integer" },
+              "title": { "type": "string" },
+              "location": { "type": "string" },
+              "modality": { "type": "string" }
+            },
+            "required": ["id_job", "title", "location", "modality"]
+          }
+        },
+        "required": ["message", "job"]
+      },
+
       "JobUpdate": {
         "type": "object",
         "properties": {
           "id_jobs": { "type": "integer" }
         }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer" },
+          "message": { "type": "string" }
+        },
+        "required": ["code", "message"]
       }
     }
   }

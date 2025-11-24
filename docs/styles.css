@@ -4,13 +4,15 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     background-color: #f5f6fa;
     display: flex;
+    height: 100vh;               /* Necesario */
+    overflow: hidden;            /* Evita scroll doble */
 }
 
 /* Sidebar */
 .sidebar {
     width: 250px;
     height: 100vh;
-    background-color: #1f2937; /* gris oscuro elegante */
+    background-color: #1f2937;
     color: white;
     padding: 20px;
     box-sizing: border-box;
@@ -56,16 +58,62 @@ body {
 /* Contenido principal */
 .content {
     margin-left: 250px;
-    padding: 40px;
-    flex: 1;
+    padding: 0;                   /* No queremos padding porque reduce el alto */
+    width: calc(100% - 250px);
+    height: 100vh;                /* Necesario */
+    box-sizing: border-box;
+    display: flex;
 }
 
-.content h1 {
-    font-size: 32px;
-    margin-bottom: 10px;
+/* Iframe */
+#content-frame {
+    width: 100%;
+    height: 100%;                 /* ¡Clave! */
+    border: none;
+    display: block;
+    background: white;
+    overflow: auto;               /* Habilita scroll interno del contenido */
 }
 
-.content p {
-    font-size: 18px;
+/* Doc hero */
+.doc-hero {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+}
+
+.doc-title {
+    font-size: 28px;
+    margin-bottom: 15px;
+    color: #111827;
+}
+
+.doc-paragraph {
+    font-size: 17px;
     color: #4b5563;
+    margin-bottom: 15px;
+}
+
+.doc-section-title {
+    margin-top: 25px;
+    font-size: 20px;
+    color: #1f2937;
+}
+
+.doc-list {
+    color: #4b5563;
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+.doc-version {
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 14px;
+    background: #e5e7eb;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: #374151;
 }

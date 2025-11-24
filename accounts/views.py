@@ -47,39 +47,52 @@ def read_account(request):
     return Response(serializer.data)
 
 
-
-
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_account(request):
-    id_account = request.data.get("id_account")
-    if not id_account:
-        return Response({"error": "Missing id_account"}, status=status.HTTP_400_BAD_REQUEST)
+    # ID del usuario autenticado
+    id_account = request.user.id_account
 
     try:
         account = Account.objects.get(id_account=id_account)
     except Account.DoesNotExist:
         return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = AccountSerializer(account, data=request.data)
+    # Solo permitimos actualizar estos campos
+    allowed_fields = {"status", "password", "subscription"}
+    data = {k: v for k, v in request.data.items() if k in allowed_fields}
+
+    if not data:
+        return Response({"error": "No valid fields provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Actualizar los campos directamente
+    for field, value in data.items():
+        setattr(account, field, value)
+    account.save()
+
+    serializer = AccountSerializer(account, data=data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-def delete_account(request):
-    id_account = request.data.get("id_account")
-    if not id_account:
-        return Response({"error": "Missing id_account"}, status=status.HTTP_400_BAD_REQUEST)
+@permission_classes([IsAuthenticated])
+def deactivate_account(request):
+    # Obtener la cuenta del usuario autenticado
+    id_account = request.user.id_account
 
     try:
         account = Account.objects.get(id_account=id_account)
     except Account.DoesNotExist:
         return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    account.delete()
-    return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
+    # Cambiar status a 0 (desactivado)
+    account.status = 0
+    account.save()
 
+    return Response({"message": "Account deactivated successfully"}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([])

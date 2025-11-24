@@ -16,7 +16,7 @@
             "in": "header",
             "name": "Authorization",
             "description": "Token JWT para autenticación",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "string",
               "example": "Bearer <token>"
@@ -69,11 +69,19 @@
             "application/json": {
               "schema": { "$ref": "#/components/schemas/Account" },
               "examples": {
-                "Ejemplo": {
+                "Ejemplo candidato": {
                   "value": {
-                    "user": "nuevo_user",
-                    "password": "123456",
-                    "subscription": "basic",
+                    "user": "correo@electronico",
+                    "password": "contraseña",
+                    "subscription": "candidate",
+                    "status": 1
+                  }
+                },
+                "Ejemplo compañia": {
+                  "value": {
+                    "user": "correo@electronico",
+                    "password": "contraseña",
+                    "subscription": "companie",
                     "status": 1
                   }
                 }
@@ -83,7 +91,7 @@
         },
         "responses": {
           "201": {
-            "description": "Cuenta creada",
+            "description": "Cuenta creada correctamente",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Account" }
@@ -91,7 +99,7 @@
             }
           },
           "400": {
-            "description": "Error",
+            "description": "Error 400: BAD REQUEST",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }
@@ -105,18 +113,19 @@
       "post": {
         "tags": ["Accounts"],
         "summary": "Leer cuenta(s)",
-        "description": "Retorna una cuenta específica si se envía `id_account`, o todas si no se envía.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": { "id_account": { "type": "integer" } }
-              }
+        "description": "Retorna la informacion de la cuenta que coincide con el `token`.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Información de la(s) cuenta(s)",
@@ -149,56 +158,46 @@
       "post": {
         "tags": ["Accounts"],
         "summary": "Actualizar cuenta",
-        "description": "Actualiza una cuenta existente mediante `id_account`.",
+        "description": "Actualiza la cuenta que esa asociada al `token`. \n ### Campos que puedes actualizar\n- `status`\n- `password`\n- `subscription`",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/Account" }
+              "schema": { "$ref": "#/components/schemas/AccountUpdate" }
             }
           }
         },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Cuenta actualizada",
+            "description": "Cuenta actualizada exitosamente",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Account" } }
             }
           },
-          "404": {
-            "description": "Cuenta no encontrada",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
-            }
-          }
-        }
-      }
-    },
-    "/accounts/delete/": {
-      "post": {
-        "tags": ["Accounts"],
-        "summary": "Eliminar cuenta",
-        "description": "Elimina una cuenta mediante `id_account`.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": { "id_account": { "type": "integer" } }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Eliminación exitosa",
+          "400": {
+            "description": "No se proporcionaron campos válidos o error de validación",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": { "message": { "type": "string" } },
-                  "example": { "message": "Account deleted successfully" }
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "NoValidFields": {
+                    "value": { "code": 0, "message": "No valid fields provided" }
+                  },
+                  "ValidationError": {
+                    "value": { "code": 0, "message": "Error de validación de datos" }
+                  }
                 }
               }
             }
@@ -206,7 +205,68 @@
           "404": {
             "description": "Cuenta no encontrada",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "AccountNotFound": {
+                    "value": { "code": 0, "message": "Account not found" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/deactivate/": {
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Desactivar cuenta",
+        "description": "Desactiva la cuenta asociada al `token` del usuario autenticado.\n\nCambia el campo `status` a `0`.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {}
+        },
+        "responses": {
+          "200": {
+            "description": "Cuenta desactivada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" }
+                  },
+                  "example": {
+                    "message": "Account deactivated successfully"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cuenta no encontrada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "AccountNotFound": {
+                    "value": { "code": 0, "message": "Account not found" }
+                  }
+                }
+              }
             }
           }
         }
@@ -309,6 +369,14 @@
           "subscription": { "type": "string" }
         },
         "required": ["user", "password", "subscription"]
+      },
+      "AccountUpdate": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer" },
+          "password": { "type": "string" },
+          "subscription": { "type": "string" }
+        }
       },
       "TokenLoginRequest": {
         "type": "object",

@@ -16,17 +16,63 @@
       "get": {
         "tags": ["Companies"],
         "summary": "Listar compañías",
-        "description": "Lista todas las compañías registradas",
+        "description": "Obtiene una lista de todas las compañías registradas.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Lista de compañías",
+            "description": "Lista de compañías obtenida correctamente",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Company"
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Company" }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "results": {
+                          "type": "array",
+                          "items": { "type": "object" }
+                        }
+                      },
+                      "example": {
+                        "message": "No companies found",
+                        "results": []
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "details": { "type": "string" }
                   }
+                },
+                "example": {
+                  "error": "Unexpected server error",
+                  "details": "error message here"
                 }
               }
             }
@@ -38,8 +84,24 @@
       "get": {
         "tags": ["Companies"],
         "summary": "Obtener compañía del usuario",
-        "description": "Devuelve la compañía asociada al usuario autenticado",
+        "description": "Devuelve la compañía asociada al usuario autenticado por el `token`",
         "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {}
+        },
         "responses": {
           "200": {
             "description": "Compañía encontrada",
@@ -71,35 +133,63 @@
       "post": {
         "tags": ["Companies"],
         "summary": "Crear compañía",
-        "description": "Crea una nueva compañía para el usuario autenticado",
-        "security": [{"bearerAuth": []}],
+        "description": "Crea una nueva compañía asociada automáticamente al usuario autenticado.",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {"$ref": "#/components/schemas/CompanyCreateRequest"},
+              "schema": { "$ref": "#/components/schemas/Company" },
               "example": {
-                "name": "Mi Compañía",
-                "address": "Calle 123",
-                "phone": "555-1234"
+                "name": "Tech Solutions MX",
+                "address": {
+                  "street": "Av. Central 123",
+                  "state": "CDMX",
+                  "zip_code": "01234",
+                  "country": "Mexico"
+                },
+                "primary_contact": "Luis Perez",
+                "title_pc": "Director",
+                "phone_number_pc": "55-1234-5678",
+                "email_pc": "luis@techmx.com",
+                "secondary_contact": "Maria Lopez",
+                "title_sc": "Asistente",
+                "phone_number_sc": "55-8765-4321",
+                "email_sc": "maria@techmx.com",
+                "description": "Desarrollo de software",
+                "link": "https://techmx.com"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Compañía creada",
+            "description": "Compañía creada correctamente",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/Company"}
+                "schema": { "$ref": "#/components/schemas/Company" }
               }
             }
           },
           "400": {
-            "description": "Error en los datos",
+            "description": "Error en los datos proporcionados",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/Error"}
+                "schema": { "$ref": "#/components/schemas/Error" }
               }
             }
           }
@@ -112,15 +202,41 @@
         "summary": "Actualizar compañía",
         "description": "Actualiza la compañía asociada al usuario autenticado",
         "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer <token>"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {"$ref": "#/components/schemas/CompanyUpdateRequest"},
+              "schema": {"$ref": "#/components/schemas/Company"},
               "example": {
-                "name": "Mi Compañía Actualizada",
-                "address": "Calle 456",
-                "phone": "555-5678"
+                "name": "Tech Solutions MX",
+                "address": {
+                  "street": "Av. Central 123",
+                  "state": "CDMX",
+                  "zip_code": "01234",
+                  "country": "Mexico"
+                },
+                "primary_contact": "Luis Perez",
+                "title_pc": "Director",
+                "phone_number_pc": "55-1234-5678",
+                "email_pc": "luis@techmx.com",
+                "secondary_contact": "Maria Lopez",
+                "title_sc": "Asistente",
+                "phone_number_sc": "55-8765-4321",
+                "email_sc": "maria@techmx.com",
+                "description": "Desarrollo de software",
+                "link": "https://techmx.com"
               }
             }
           }
@@ -200,13 +316,51 @@
       "Company": {
         "type": "object",
         "properties": {
-          "id": {"type": "integer"},
-          "name": {"type": "string"},
-          "address": {"type": "string"},
-          "phone": {"type": "string"},
-          "account": {"type": "integer"}
+          "id_company": { "type": "integer" },
+          "name": { "type": "string" },
+          "account": { "type": "integer" },
+
+          "address": {
+            "type": "object",
+            "properties": {
+              "id_address": { "type": "integer" },
+              "street": { "type": "string" },
+              "state": { "type": "string" },
+              "zip_code": { "type": "string" },
+              "country": { "type": "string" }
+            },
+            "required": ["street", "state", "zip_code", "country"]
+          },
+
+          "primary_contact": { "type": "string" },
+          "title_pc": { "type": "string" },
+          "phone_number_pc": { "type": "string" },
+          "email_pc": { "type": "string" },
+
+          "secondary_contact": { "type": "string" },
+          "title_sc": { "type": "string" },
+          "phone_number_sc": { "type": "string" },
+          "email_sc": { "type": "string" },
+
+          "description": { "type": "string" },
+          "link": { "type": "string" }
         },
-        "required": ["name", "address", "phone"]
+
+        "required": [
+          "name",
+          "account",
+          "address",
+          "primary_contact",
+          "title_pc",
+          "phone_number_pc",
+          "email_pc",
+          "secondary_contact",
+          "title_sc",
+          "phone_number_sc",
+          "email_sc",
+          "description",
+          "link"
+        ]
       },
       "CompanyCreateRequest": {
         "type": "object",

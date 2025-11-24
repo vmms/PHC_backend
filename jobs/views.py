@@ -36,10 +36,6 @@ def _company_allowed(user):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_jobs(request):
-    """
-    Lista jobs activos. Si quieres que liste solo los de la company del token,
-    cambia el filtro por company=company.
-    """
     qs = Job.objects.filter(is_active=True).order_by('-day_start')
     serializer = JobSerializer(qs, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
