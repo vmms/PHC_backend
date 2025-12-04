@@ -6,7 +6,7 @@
     "description": "Endpoints para manejar Candidates asociados a cuentas de usuario."
   },
   "paths": {
-    "/candidates/get/": {
+    "/api/candidates/get/": {
       "get": {
         "tags": ["Candidates"],
         "summary": "Obtener Candidate del usuario autenticado",
@@ -47,7 +47,7 @@
       }
     },
 
-    "/candidates/create/": {
+    "/api/candidates/create/": {
       "post": {
         "tags": ["Candidates"],
         "summary": "Crear Candidate",
@@ -93,7 +93,7 @@
       }
     },
 
-    "/candidates/update/": {
+    "/api/candidates/update/": {
       "put": {
         "tags": ["Candidates"],
         "summary": "Actualizar Candidate",
@@ -153,7 +153,7 @@
       }
     },
 
-    "/candidates/delete/": {
+    "/api/candidates/delete/": {
       "delete": {
         "tags": ["Candidates"],
         "summary": "Eliminar Candidate",
@@ -197,7 +197,7 @@
       }
     },
 
-    "/candidates/list/": {
+    "/api/candidates/list/": {
       "get": {
         "tags": ["Candidates"],
         "summary": "Listar Candidates",
@@ -249,6 +249,7 @@
               "id_address": { "type": "integer" },
               "street": { "type": "string" },
               "state": { "type": "string" },
+              "city": { "type": "string" },
               "zip_code": { "type": "string" },
               "country": { "type": "string" }
             }

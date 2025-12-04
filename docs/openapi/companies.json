@@ -12,7 +12,7 @@
     }
   ],
   "paths": {
-    "/companies/list/": {
+    "/api/companies/list/": {
       "get": {
         "tags": ["Companies"],
         "summary": "Listar compañías",
@@ -80,7 +80,7 @@
         }
       }
     },
-    "/companies/get/": {
+    "/api/companies/get/": {
       "get": {
         "tags": ["Companies"],
         "summary": "Obtener compañía del usuario",
@@ -129,7 +129,7 @@
         }
       }
     },
-    "/companies/create/": {
+    "/api/companies/create/": {
       "post": {
         "tags": ["Companies"],
         "summary": "Crear compañía",
@@ -159,9 +159,11 @@
                 "address": {
                   "street": "Av. Central 123",
                   "state": "CDMX",
+                  "city": "CDMX",
                   "zip_code": "01234",
                   "country": "Mexico"
                 },
+                "type_business": "Develop",
                 "primary_contact": "Luis Perez",
                 "title_pc": "Director",
                 "phone_number_pc": "55-1234-5678",
@@ -196,7 +198,7 @@
         }
       }
     },
-    "/companies/update/": {
+    "/api/companies/update/": {
       "put": {
         "tags": ["Companies"],
         "summary": "Actualizar compañía",
@@ -224,6 +226,7 @@
                 "address": {
                   "street": "Av. Central 123",
                   "state": "CDMX",
+                  "city": "CDMX",
                   "zip_code": "01234",
                   "country": "Mexico"
                 },
@@ -272,7 +275,7 @@
         }
       }
     },
-    "/companies/delete/{pk}/": {
+    "/api/companies/delete/{pk}/": {
       "delete": {
         "tags": ["Companies"],
         "summary": "Eliminar compañía",
@@ -326,6 +329,7 @@
               "id_address": { "type": "integer" },
               "street": { "type": "string" },
               "state": { "type": "string" },
+              "city": { "type": "string" },
               "zip_code": { "type": "string" },
               "country": { "type": "string" }
             },

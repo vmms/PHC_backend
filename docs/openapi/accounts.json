@@ -6,7 +6,7 @@
     "description": "Endpoints para manejar cuentas de usuario"
   },
   "paths": {
-    "/accounts/list/": {
+    "/api/accounts/list/": {
       "get": {
         "tags": ["Accounts"],
         "summary": "Listar cuentas",
@@ -58,7 +58,7 @@
         }
       }
     },
-    "/accounts/create/": {
+    "/api/accounts/create/": {
       "post": {
         "tags": ["Accounts"],
         "summary": "Crear cuenta",
@@ -109,7 +109,7 @@
         }
       }
     },
-    "/accounts/read/": {
+    "/api/accounts/read/": {
       "post": {
         "tags": ["Accounts"],
         "summary": "Leer cuenta(s)",
@@ -154,7 +154,7 @@
         }
       }
     },
-    "/accounts/update/": {
+    "/api/accounts/update/": {
       "post": {
         "tags": ["Accounts"],
         "summary": "Actualizar cuenta",
@@ -218,7 +218,7 @@
         }
       }
     },
-    "/accounts/deactivate/": {
+    "/api/accounts/deactivate/": {
       "post": {
         "tags": ["Accounts"],
         "summary": "Desactivar cuenta",
@@ -272,7 +272,7 @@
         }
       }
     },
-    "/accounts/token_login/": {
+    "/api/accounts/token_login/": {
       "post": {
         "tags": ["Accounts"],
         "summary": "Login con token JWT",

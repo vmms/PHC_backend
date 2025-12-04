@@ -4,6 +4,7 @@ class Address(models.Model):
     id_address = models.AutoField(primary_key=True)
     street = models.CharField(max_length=100, null=True, blank=True)
     state = models.CharField(max_length=45, null=True, blank=True)
+    city = models.CharField(max_length=45, null=True, blank=True)
     zip_code = models.CharField(max_length=10, null=True, blank=True)
     country = models.CharField(max_length=45, null=True, blank=True)
 

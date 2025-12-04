@@ -8,6 +8,7 @@ class Company(models.Model):
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
     address = models.ForeignKey(Address, on_delete=models.CASCADE)
     primary_contact = models.CharField(max_length=45)
+    type_business = models.CharField(max_length=100)
     title_pc = models.CharField(max_length=45)
     phone_number_pc = models.CharField(max_length=20)
     email_pc = models.EmailField(max_length=100)

@@ -8,5 +8,5 @@ urlpatterns = [
     path('skills/', include('skills.urls')),
     path('schedulers/', include('schedulers.urls')),
     path('jobs/', include('jobs.urls')),
-    #path('messages_app/', include('messages_app.urls')),
+    path('messages_app/', include('messages_app.urls')),
 ]

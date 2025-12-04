@@ -1,0 +1,199 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Messages API",
+    "version": "1.0.0",
+    "description": "**API para la gestión de mensajes entre candidatos y empresas.**\n\nIncluye autenticación JWT, manejo de conversaciones, mensajes leídos/no leídos y chat detallado."
+  },
+  "paths": {
+    "/api/messages/create/": {
+      "post": {
+        "summary": "Crear un mensaje",
+        "description": "Permite enviar un mensaje entre un candidato y una empresa.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": { "type": "string", "example": "Bearer <token>" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "receiver_candidate_id": { "type": "integer", "description": "ID del candidato (si empresa)" },
+                  "receiver_company_id": { "type": "integer", "description": "ID de la empresa (si candidato básico)" },
+                  "message": { "type": "string", "description": "Texto del mensaje" }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mensaje creado correctamente",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Message" }
+              }
+            }
+          },
+          "400": { "description": "Datos faltantes o tipo de cuenta desconocido" },
+          "404": { "description": "Candidato o empresa no encontrado" }
+        }
+      }
+    },
+
+    "/api/messages/list_chats/": {
+      "post": {
+        "summary": "Lista de chats",
+        "description": "Devuelve con quién ha hablado el usuario y si hay mensajes no leídos.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": { "type": "string", "example": "Bearer <token>" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de chat partners",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ChatPartner" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/messages/chat_detail/": {
+      "post": {
+        "summary": "Detalle de chat",
+        "description": "Obtiene todos los mensajes entre el usuario y otra cuenta.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": { "type": "string", "example": "Bearer <token>" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "candidate_id": { "type": "integer" },
+                  "company_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lista de mensajes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MessageDetail" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Debe enviar candidate_id o company_id" },
+          "404": { "description": "Candidato o empresa no encontrado" }
+        }
+      }
+    },
+
+    "/api/messages/mark_read/": {
+      "post": {
+        "summary": "Marcar mensaje como leído",
+        "description": "Marca un mensaje específico como leído por el usuario.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "description": "Token JWT para autenticación",
+            "required": true,
+            "schema": { "type": "string", "example": "Bearer <token>" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "id_message": { "type": "integer" } }, "required": ["id_message"] }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Mensaje marcado como leído", "content": { "application/json": { "example": { "message": "read" } } } },
+          "404": { "description": "Mensaje no encontrado o no autorizado" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id_message": { "type": "integer" },
+          "sender_account": { "type": "integer" },
+          "receiver_account_id": { "type": "integer" },
+          "message": { "type": "string" },
+          "status": { "type": "integer", "description": "0=no leído, 1=leído" },
+          "conversation_id": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id_message", "sender_account", "receiver_account_id", "message", "status", "conversation_id", "created_at"]
+      },
+      "ChatPartner": {
+        "type": "object",
+        "properties": {
+          "company_id": { "type": "integer" },
+          "company_name": { "type": "string" },
+          "candidate_id": { "type": "integer" },
+          "candidate_name": { "type": "string" },
+          "has_unread": { "type": "boolean" }
+        }
+      },
+      "MessageDetail": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string", "enum": ["me", "other"] },
+          "message": { "type": "string" },
+          "status": { "type": "integer", "description": "0=no leído, 1=leído" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["from", "message", "status", "created_at"]
+      }
+    }
+  }
+}
