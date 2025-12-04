@@ -135,7 +135,78 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/JobCreate" }
+              "schema": {
+                "$ref": "#/components/schemas/JobCreate"
+              },
+              "examples": {
+                "EjemploBase": {
+                  "summary": "Ejemplo base con strings",
+                  "value": {
+                    "title": "string",
+                    "type": "string",
+                    "location": "string",
+                    "salary": "string",
+                    "experience": "string",
+                    "schedule_type": "string",
+                    "employment_type": "string",
+                    "modality": "string",
+                    "benefits": "string",
+                    "requirements": "string",
+                    "day_start": "2025-12-04",
+                    "description": "string",
+                    "max_applications": 0,
+                    "auto_close": true,
+                    "work_mode": "string",
+                    "contract_type": "string",
+                    "skills": [
+                      {
+                        "id_skills": 0
+                      }
+                    ],
+                    "schedule": [
+                      {
+                        "day": "string",
+                        "time_start": "string",
+                        "time_finish": "string"
+                      }
+                    ]
+                  }
+                },
+                "EjemploCompleto": {
+                  "summary": "Vacante real completa",
+                  "value": {
+                    "type": "Vacante",
+                    "title": "Diseñador UX/UI",
+                    "location": "Monterrey",
+                    "salary": "38000",
+                    "experience": "1 año",
+                    "schedule_type": "diurno",
+                    "employment_type": "tiempo completo",
+                    "modality": "presencial",
+                    "benefits": "Vales de despensa, Caja de ahorro",
+                    "requirements": "Conocimiento en Figma, diseño de interfaces, prototipado",
+                    "day_start": "2025-12-15",
+                    "description": "Creación de interfaces intuitivas y prototipos de alta fidelidad.",
+                    "is_active": true,
+                    "max_applications": 20,
+                    "auto_close": false,
+                    "work_mode": "presencial",
+                    "contract_type": "temporal",
+                    "skills": [
+                      { "id_skills": 1 },
+                      { "id_skills": 2 },
+                      { "id_skills": 3 }
+                    ],
+                    "schedule": [
+                      { "day": "Monday", "time_start": "09:00", "time_finish": "17:00" },
+                      { "day": "Tuesday", "time_start": "09:00", "time_finish": "17:00" },
+                      { "day": "Wednesday", "time_start": "09:00", "time_finish": "17:00" },
+                      { "day": "Thursday", "time_start": "10:00", "time_finish": "18:00" },
+                      { "day": "Friday", "time_start": "10:00", "time_finish": "16:00" }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
