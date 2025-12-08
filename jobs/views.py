@@ -8,7 +8,7 @@ from .serializers import JobSerializer
 from companies.models import Company
 from candidates.models import Candidate
 from django.db import transaction
-
+from collections import defaultdict
 
 from skills.models import Skill
 from schedulers.models import Scheduler
@@ -36,7 +36,7 @@ def _company_allowed(user):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_jobs(request):
-    qs = Job.objects.filter(is_active=True).order_by('-day_start')
+    qs = Job.objects.filter(is_active=True).order_by('-id_jobs')
     serializer = JobSerializer(qs, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -68,15 +68,39 @@ def get_job(request):
     # ------------------------------------------------------
     # Obtener schedule asociados a través de la tabla intermedia
     # ------------------------------------------------------
-    schedule_links = ScheduleHasJobs.objects.filter(jobs=job).select_related('schedule')
-    schedule_list = [
-        {
-            "day": link.schedule.day,
-            "time_start": link.schedule.time_start.strftime("%H:%M") if link.schedule.time_start else None,
-            "time_finish": link.schedule.time_finish.strftime("%H:%M") if link.schedule.time_finish else None
-        }
-        for link in schedule_links
-    ]
+    # Diccionario temporal para agrupar schedules por tipo
+    temp_schedule = defaultdict(list)
+
+    for link in ScheduleHasJobs.objects.filter(jobs=job).select_related('schedule'):
+        sched = link.schedule
+        if sched.type == "permanent":
+            temp_schedule["permanent"].append({
+                "day": getattr(sched, "day", None),
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+        elif sched.type == "range":
+            temp_schedule["range"].append({
+                "date_start": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                "date_end": getattr(sched, "date_end", None).strftime("%Y-%m-%d") if getattr(sched, "date_end", None) else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+        elif sched.type == "multiple":
+            temp_schedule["multiple"].append({
+                "date": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+
+    # Construir la lista final
+    schedule_data = []
+    for sched_type, items in temp_schedule.items():
+        schedule_data.append({
+            "type": sched_type,
+            "dates" if sched_type == "multiple" else "days": items
+        })
+
 
     # ------------------------------------------------------
     # Armar el JSON final
@@ -87,20 +111,18 @@ def get_job(request):
         "location": job.location,
         "salary": job.salary,
         "experience": job.experience,
-        "schedule_type": job.schedule_type,
         "employment_type": job.employment_type,
         "modality": job.modality,
         "benefits": job.benefits,
-        "requirements": job.requirements,
-        "day_start": job.day_start.strftime("%Y-%m-%d") if job.day_start else None,
         "description": job.description,
         "is_active": job.is_active,
-        "max_applications": job.max_applications,
         "auto_close": job.auto_close,
-        "work_mode": job.work_mode,
         "contract_type": job.contract_type,
+        "qualifications": job.qualifications,
+        "oportunity": job.oportunity,
+        "other": job.other,
         "skills": skills_list,
-        "schedule": schedule_list
+        "schedule": schedule_data  
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
@@ -123,57 +145,99 @@ def create_job(request):
     data.pop('company', None)
     data.pop('company_id', None)
 
-    # Normalizar skills (IDs existentes)
-    skill_ids = []
+    # ===========================================
+    #   NUEVA LÓGICA PARA SKILLS (strings)
+    # ===========================================
+    skill_names = []
     if "skills" in data:
         for item in data["skills"]:
-            if "id_skills" in item:
-                skill_ids.append(item["id_skills"])
-    data["skills"] = skill_ids
+            if "skill" in item and item["skill"]:
+                skill_names.append(item["skill"].strip())
 
-    # Normalizar schedule (crear nuevos)
+    # El serializer NO maneja skills directamente
+    data["skills"] = []
+
+    # ===========================================
+    #   NORMALIZAR SCHEDULES
+    # ===========================================
     schedule_payload = data.pop("schedule", [])
 
     serializer = JobSerializer(data=data)
     if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     job = serializer.save(company=company)
 
-    # ----------------------------------------------------
-    #   INSERTAR SKILLS (skills ya existen)
-    # ----------------------------------------------------
-    for sid in skill_ids:
-        try:
-            skill_obj = Skill.objects.get(id_skills=sid)
-        except Skill.DoesNotExist:
-            return Response({"message": f"Skill ID {sid} does not exist"},status=status.HTTP_404_NOT_FOUND)
+    # ===========================================
+    #   PROCESAR SKILLS (buscar o crear)
+    # ===========================================
+    pk_name = job._meta.pk.name
+    job_pk_value = getattr(job, pk_name)
 
+    for name in skill_names:
+        skill_obj, created = Skill.objects.get_or_create(name=name)
         SkillsHasJobs.objects.get_or_create(
-            skills=skill_obj,
-            jobs=job
+            skills_id=skill_obj.id_skills,
+            jobs_id=job_pk_value
         )
 
-
-    # ----------------------------------------------------
-    #   CREAR SCHEDULES Y LIGARLOS
-    # ----------------------------------------------------
+    # ===========================================
+    #   CREAR SCHEDULES Y RELACIONARLOS
+    # ===========================================
     for sch in schedule_payload:
-        # Crear el scheduler
-        scheduler = Scheduler.objects.create(
-            day=sch.get("day"),
-            time_start=sch.get("time_start"),
-            time_finish=sch.get("time_finish")
-        )
 
-        # Ligarlo a job
-        ScheduleHasJobs.objects.get_or_create(
-            schedule=scheduler,
-            jobs=job
-        )
+        # ---------------------------
+        # CASE: MULTIPLE
+        # ---------------------------
+        if "multiple" in sch and sch["multiple"]:
+            for item in sch["multiple"]:
+                scheduler = Scheduler.objects.create(
+                    type="multiple",
+                    day=None,                     # varchar(3), no aplica
+                    date_start=item.get("date_start"),  # usamos date_start del JSON
+                    date_end=None,
+                    time_start=item.get("time_start"),
+                    time_finish=item.get("time_end")
+                )
+                ScheduleHasJobs.objects.get_or_create(schedule=scheduler, jobs=job)
+            continue
+
+        # ---------------------------
+        # CASE: RANGE
+        # ---------------------------
+        elif "range" in sch and sch["range"]:
+            for item in sch["range"]:
+                scheduler = Scheduler.objects.create(
+                    type="range",
+                    day=None,
+                    date_start=item.get("date_start"),
+                    date_end=item.get("date_end"),
+                    time_start=item.get("time_start"),
+                    time_finish=item.get("time_end")
+                )
+                ScheduleHasJobs.objects.get_or_create(schedule=scheduler, jobs=job)
+            continue
+
+        # ---------------------------
+        # CASE: PERMANENT
+        # ---------------------------
+        elif "permanent" in sch and sch["permanent"]:
+            perm = sch["permanent"]
+            start_date = perm.get("start_date")
+            for day_item in perm.get("days", []):
+                scheduler = Scheduler.objects.create(
+                    type="permanent",
+                    day=day_item.get("day"),
+                    date_start=start_date,
+                    date_end=None,
+                    time_start=day_item.get("time_start"),
+                    time_finish=day_item.get("time_end")
+                )
+                ScheduleHasJobs.objects.get_or_create(schedule=scheduler, jobs=job)
+
     response_data = serializer.format_response(job)
     return Response(response_data, status=status.HTTP_201_CREATED)
-    # return Response(JobSerializer(job).data, status=status.HTTP_201_CREATED)
+
 
 # ---------------------------
 # ACTUALIZAR JOB (POST) - usa company del token para validar propiedad

@@ -6,13 +6,13 @@ from companies.models import Company
 
 class JobSerializer(serializers.ModelSerializer):
     skills = serializers.ListField(
-        child=serializers.IntegerField(), 
-        write_only=True, 
+        child=serializers.IntegerField(),
+        write_only=True,
         required=False
     )
     schedules = serializers.ListField(
-        child=serializers.IntegerField(), 
-        write_only=True, 
+        child=serializers.IntegerField(),
+        write_only=True,
         required=False
     )
 
@@ -26,19 +26,17 @@ class JobSerializer(serializers.ModelSerializer):
             'location',
             'salary',
             'experience',
-            'schedule_type',
             'employment_type',
             'modality',
             'benefits',
-            'requirements',
-            'day_start',
             'description',
+            'qualifications',
+            'oportunity',
+            'other',
             'is_active',
             'created_at',
             'updated_at',
-            'max_applications',
             'auto_close',
-            'work_mode',
             'contract_type',
             'skills',
             'schedules'
@@ -98,8 +96,6 @@ class JobSerializer(serializers.ModelSerializer):
             "job": {
                 "id_job": instance.id_jobs,
                 "title": instance.title,
-                "location": instance.location,
-                "modality": instance.modality,
             }
         }
 

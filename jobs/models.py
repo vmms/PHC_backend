@@ -17,30 +17,30 @@ class Job(models.Model):
         db_column='company_id'
     )
 
-    type = models.CharField(max_length=45)
+    type = models.CharField(max_length=45, null=True, blank=True)
     title = models.CharField(max_length=100)
     location = models.CharField(max_length=100)
     salary = models.CharField(max_length=45)
     experience = models.CharField(max_length=45)
 
-    schedule_type = models.CharField(max_length=45)
     employment_type = models.CharField(max_length=45)
     modality = models.CharField(max_length=45)
 
     benefits = models.CharField(max_length=200, null=True, blank=True)
-    requirements = models.TextField(null=True, blank=True)
-
-    day_start = models.DateField()
     description = models.TextField()
 
+    # Nuevos según JSON
+    qualifications = models.TextField(null=True, blank=True)
+    oportunity = models.CharField(max_length=200, null=True, blank=True)
+    other = models.CharField(max_length=200, null=True, blank=True)
+
+    # Control
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_column='created_at')
     updated_at = models.DateTimeField(auto_now=True, db_column='updated_at')
 
-    max_applications = models.IntegerField(null=True, blank=True)
     auto_close = models.BooleanField(default=False)
-    work_mode = models.CharField(max_length=10, null=True, blank=True)
     contract_type = models.CharField(max_length=15, null=True, blank=True)
 
     class Meta:

@@ -139,71 +139,112 @@
                 "$ref": "#/components/schemas/JobCreate"
               },
               "examples": {
-                "EjemploBase": {
-                  "summary": "Ejemplo base con strings",
+                "Ejemplo Permanent": {
+                  "summary": "Vacante real completa",
                   "value": {
-                    "title": "string",
-                    "type": "string",
-                    "location": "string",
-                    "salary": "string",
-                    "experience": "string",
-                    "schedule_type": "string",
-                    "employment_type": "string",
-                    "modality": "string",
-                    "benefits": "string",
-                    "requirements": "string",
-                    "day_start": "2025-12-04",
-                    "description": "string",
-                    "max_applications": 0,
-                    "auto_close": true,
-                    "work_mode": "string",
-                    "contract_type": "string",
+                    "title": "Desarrollador Backend",
+                    "location": "Ciudad de México",
+                    "type": "permanent",
+                    "employment_type": "full_time",
+                    "modality": "on_site",
+                    "experience": "2 años",
                     "skills": [
+                      { "skill": "Python" },
+                      { "skill": "Django" }
+                    ],
+                    "description": "Desarrollo de APIs y mantenimiento de backend",
+                    "qualifications": "Conocimiento avanzado en Python y Django",
+
+                    "schedule": [
                       {
-                        "id_skills": 0
+                        "permanent": {
+                          "start_date": "2025-12-25",
+                          "days": [
+                            {
+                              "day": "mon",
+                              "time_start": "10:00",
+                              "time_end": "13:00"
+                            },
+                            {
+                              "day": "wed",
+                              "time_start": "10:00",
+                              "time_end": "13:00"
+                            }
+                          ]
+                        }
                       }
+                    ],
+
+                    "salary": 38000,
+                    "benefits": "Seguro médico, Vales de despensa",
+                    "oportunity": "Proyecto a largo plazo",
+                    "other": "Home office opcional"
+                  }
+                },
+                "Ejemplo Range": {
+                  "summary": "Vacante real completa",
+                  "value": {
+                    "title": "Desarrollador Backend",
+                    "location": "Ciudad de México",
+                    "type": "permanent",
+                    "employment_type": "full_time",
+                    "modality": "on_site",
+                    "experience": "2 años",
+                    "salary": "35000",
+                    "benefits": "Seguro médico, Vales de despensa",
+                    "description": "Responsable del desarrollo de APIs REST en Django",
+                    "qualifications": "Experiencia con Django y DRF",
+                    "oportunity": "Proyecto de crecimiento",
+                    "other": "Trabajo en equipo",
+                    "skills": [
+                      { "skill": "Python" },
+                      { "skill": "Django" },
+                      { "skill": "REST" }
                     ],
                     "schedule": [
                       {
-                        "day": "string",
-                        "time_start": "string",
-                        "time_finish": "string"
+                        "range": [
+                          {
+                            "date_start": "2025-12-08",
+                            "date_end": "2025-12-12",
+                            "time_start": "08:00",
+                            "time_end": "18:00"
+                          }
+                        ]
                       }
                     ]
                   }
                 },
-                "EjemploCompleto": {
+                "Ejemplo Multiple": {
                   "summary": "Vacante real completa",
                   "value": {
-                    "type": "Vacante",
-                    "title": "Diseñador UX/UI",
-                    "location": "Monterrey",
-                    "salary": "38000",
-                    "experience": "1 año",
-                    "schedule_type": "diurno",
-                    "employment_type": "tiempo completo",
-                    "modality": "presencial",
-                    "benefits": "Vales de despensa, Caja de ahorro",
-                    "requirements": "Conocimiento en Figma, diseño de interfaces, prototipado",
-                    "day_start": "2025-12-15",
-                    "description": "Creación de interfaces intuitivas y prototipos de alta fidelidad.",
-                    "is_active": true,
-                    "max_applications": 20,
-                    "auto_close": false,
-                    "work_mode": "presencial",
-                    "contract_type": "temporal",
+                    "title": "Desarrollador Backend",
+                    "location": "Ciudad de México",
+                    "type": "permanent",
+                    "employment_type": "full_time",
+                    "modality": "on_site",
+                    "experience": "2 años",
                     "skills": [
-                      { "id_skills": 1 },
-                      { "id_skills": 2 },
-                      { "id_skills": 3 }
+                      { "skill": "Python" },
+                      { "skill": "Django" }
                     ],
+                    "description": "Desarrollo de APIs y mantenimiento de backend",
+                    "qualifications": "Conocimiento avanzado en Python y Django",
                     "schedule": [
-                      { "day": "Monday", "time_start": "09:00", "time_finish": "17:00" },
-                      { "day": "Tuesday", "time_start": "09:00", "time_finish": "17:00" },
-                      { "day": "Wednesday", "time_start": "09:00", "time_finish": "17:00" },
-                      { "day": "Thursday", "time_start": "10:00", "time_finish": "18:00" },
-                      { "day": "Friday", "time_start": "10:00", "time_finish": "16:00" }
-                    ]
+                      {
+                        "multiple": [
+                          { "date_start": "2025-12-08", "time_start": "09:00", "time_end": "13:00" },
+                          { "date_start": "2025-12-09", "time_start": "09:00", "time_end": "13:00" },
+                          { "date_start": "2025-12-10", "time_start": "09:00", "time_end": "13:00" },
+                          { "date_start": "2025-12-11", "time_start": "09:00", "time_end": "13:00" },
+                          { "date_start": "2025-12-12", "time_start": "09:00", "time_end": "13:00" }
+                        ]
+                      }
+                    ],
+                    "salary": 38000,
+                    "benefits": "Seguro médico, Vales de despensa",
+                    "oportunity": "Proyecto a largo plazo",
+                    "other": "Home office opcional"
                   }
                 }
               }
