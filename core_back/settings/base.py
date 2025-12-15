@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'jobs',
     'skills',
     'schedulers',
+    'jobApplication',
 ]
 
 
@@ -131,8 +132,6 @@ WSGI_APPLICATION = 'core_back.wsgi.application'
 
 # -------------------
 # DATABASES
-# importante: vacío
-# cada ambiente usa su propia DB
 # -------------------
 DATABASES = {}
 
@@ -167,3 +166,7 @@ STATIC_URL = 'static/'
 # DEFAULT PK
 # -------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

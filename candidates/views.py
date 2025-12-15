@@ -1,53 +1,219 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Candidate
+from rest_framework.parsers import MultiPartParser, FormParser
+
+from .models import Candidate, CandidateHasSchedule
 from .serializers import CandidateSerializer
+from collections import defaultdict
+
+from jobs.models import Job
+from jobs.serializers import JobSerializer
+from jobApplication.models import JobApplication
+from schedulers.models import Scheduler
+from companies.models import Company
+from companies.serializers import CompanySerializer
+
+from django.utils.deconstruct import deconstructible
+from django.conf import settings
+import os
+import time
+
+from geopy.geocoders import Nominatim
+from math import radians, sin, cos, sqrt, atan2
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_candidate(request):
-    """
-    Devuelve el candidate asociado al usuario autenticado.
-    Si no existe, devuelve un mensaje indicando que no hay candidate asociado.
-    """
     try:
-        candidate = Candidate.objects.get(account=request.user)
-        serializer = CandidateSerializer(candidate)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
-        return Response({'message': 'No candidate associated with this user'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'message': 'No candidate associated with this user'}, status=404)
+
+    temp_schedule = defaultdict(list)
+
+    for link in CandidateHasSchedule.objects.filter(candidate=candidate).select_related('schedule'):
+        sched = link.schedule
+        if sched.type == "permanent":
+            temp_schedule["permanent"].append({
+                "day": getattr(sched, "day", None),
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None,
+                "hired_date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None
+            })
+        elif sched.type == "range":
+            temp_schedule["range"].append({
+                "date_start": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                "date_end": getattr(sched, "date_end", None).strftime("%Y-%m-%d") if getattr(sched, "date_end", None) else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+        elif sched.type == "multiple":
+            temp_schedule["multiple"].append({
+                "date": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+
+    schedule_data = []
+    for sched_type, items in temp_schedule.items():
+        hired_date = items[0].get("hired_date") if items else None
+        schedule_data.append({
+            "type": sched_type,
+            "hired_date": hired_date,
+            "dates" if sched_type == "multiple" else "days": items
+        })
+
+    serializer = CandidateSerializer(candidate, context={'request': request})
+    response_data = serializer.data
+    response_data["schedule"] = schedule_data
+
+    return Response(response_data, status=200)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_candidate(request):
-    """
-    Crea un candidate asociado al usuario autenticado.
-    """
-    serializer = CandidateSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(account=request.user)
-        response_data = serializer.format_response(serializer.instance)
-        return Response(response_data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)
+    data = request.data.copy()
+    data.pop('account', None)
+    data.pop('id_candidate', None)
+
+    schedule_payload = data.pop("schedule", [])
+
+    # Si viene como string, parseamos
+    if isinstance(schedule_payload, str):
+        try:
+            schedule_payload = json.loads(schedule_payload)
+        except:
+            schedule_payload = []
+
+    serializer = CandidateSerializer(data=data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    candidate = serializer.save(account=request.user)
+
+    # ============================================
+    # PROCESAR SCHEDULES (igual que en jobs)
+    # ============================================
+    for sch in schedule_payload:
+
+        # CASE: MULTIPLE
+        if "multiple" in sch and sch["multiple"]:
+            for item in sch["multiple"]:
+                scheduler = Scheduler.objects.create(
+                    type="multiple",
+                    day=None,
+                    date_start=item.get("date_start"),
+                    date_end=None,
+                    time_start=item.get("time_start"),
+                    time_finish=item.get("time_end")
+                )
+                CandidateHasSchedule.objects.get_or_create(schedule=scheduler, candidate=candidate)
+            continue
+
+        # CASE: RANGE
+        elif "range" in sch and sch["range"]:
+            for item in sch["range"]:
+                scheduler = Scheduler.objects.create(
+                    type="range",
+                    day=None,
+                    date_start=item.get("date_start"),
+                    date_end=item.get("date_end"),
+                    time_start=item.get("time_start"),
+                    time_finish=item.get("time_end")
+                )
+                CandidateHasSchedule.objects.get_or_create(schedule=scheduler, candidate=candidate)
+            continue
+
+        # CASE: PERMANENT
+        elif "permanent" in sch and sch["permanent"]:
+            perm = sch["permanent"]
+            start_date = perm.get("start_date")
+            for day_item in perm.get("days", []):
+                scheduler = Scheduler.objects.create(
+                    type="permanent",
+                    day=day_item.get("day"),
+                    date_start=start_date,
+                    date_end=None,
+                    time_start=day_item.get("time_start"),
+                    time_finish=day_item.get("time_end")
+                )
+                CandidateHasSchedule.objects.get_or_create(schedule=scheduler, candidate=candidate)
+
+    response_data = serializer.format_response(candidate)
+    return Response(response_data, status=status.HTTP_201_CREATED)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_candidate(request):
-    """
-    Actualiza el candidate asociado al usuario autenticado.
-    """
     try:
-        candidate = Candidate.objects.get(account=request.user)
+        candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
-        return Response({'message': 'No candidate associated with this user'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'message': 'No candidate associated with this user'}, status=404)
 
-    serializer = CandidateSerializer(candidate, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    data = request.data.copy()
+
+    # ===========================
+    # 1. ADDRESS UPDATE
+    # ===========================
+    address_data = data.pop('address', None)
+    if address_data:
+        for field, value in address_data.items():
+            setattr(candidate.address, field, value)
+        candidate.address.save()
+
+    # ===========================
+    # 2. EDUCATION UPDATE
+    # ===========================
+    education_data = data.pop('education', None)
+    if education_data:
+        for field, value in education_data.items():
+            setattr(candidate.education, field, value)
+        candidate.education.save()
+
+    # ===========================
+    # 3. CANDIDATE FIELDS UPDATE
+    # ===========================
+    for field, value in data.items():
+        if field not in ["schedule"]:  # schedule se procesa aparte
+            setattr(candidate, field, value)
+
+    candidate.save()
+
+    # ===========================
+    # 4. SCHEDULE UPDATE (BORRAR + CREAR)
+    # ===========================
+    schedule_data = request.data.get("schedule", [])
+
+    if schedule_data:
+        # 4.1 borrar relaciones actuales
+        CandidateHasSchedule.objects.filter(candidate=candidate).delete()
+
+        for sched_block in schedule_data:
+            perm = sched_block.get("permanent")
+            if perm:
+                start_date = perm.get("start_date")
+                days = perm.get("days", [])
+
+                for day_data in days:
+                    # crear scheduler usando tu modelo REAL
+                    new_sched = Scheduler.objects.create(
+                        type="permanent",
+                        day=day_data["day"],
+                        date_start=start_date,
+                        date_end=None,
+                        time_start=day_data["time_start"],
+                        time_finish=day_data["time_end"]  # JSON usa time_end, modelo usa time_finish
+                    )
+
+                    # crear relación
+                    CandidateHasSchedule.objects.create(
+                        candidate=candidate,
+                        schedule_id=new_sched.id_schedule
+                    )
+
+    return Response({"message": "Candidate updated successfully"}, status=200)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
@@ -72,3 +238,252 @@ def list_candidates(request):
     candidates = Candidate.objects.all()
     serializer = CandidateSerializer(candidates, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def apply_to_job(request):
+
+    account = request.user
+
+    # Candidate ligado a esa cuenta
+    try:
+        candidate = Candidate.objects.get(account=account)
+    except Candidate.DoesNotExist:
+        return Response(
+            {"message": "No existe un candidato asociado a esta cuenta"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # obtener id del job
+    job_id = request.data.get('job_id')
+    if not job_id:
+        return Response(
+            {"message": "Falta el job_id"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # obtener job
+    try:
+        job = Job.objects.get(id_jobs=job_id)
+    except Job.DoesNotExist:
+        return Response(
+            {"message": "El empleo no existe"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # validar si ya aplicó
+    if JobApplication.objects.filter(id_candidate=candidate, id_jobs=job).exists():
+        return Response(
+            {"message": "Ya aplicaste a este empleo"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # crear registro
+    JobApplication.objects.create(
+        id_candidate=candidate,
+        id_jobs=job,
+        status='applied'
+    )
+
+    return Response(
+        {"message": "Aplicación enviada con éxito"},
+        status=status.HTTP_201_CREATED
+    )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def upload_photo(request):
+    id_candidate = request.data.get('id_candidate')
+    if not id_candidate:
+        return Response({'error': 'id_candidate is required'}, status=400)
+
+    try:
+        candidate = Candidate.objects.get(id_candidate=id_candidate)
+    except Candidate.DoesNotExist:
+        return Response({'error': 'Candidate not found'}, status=404)
+
+    if 'photo' not in request.FILES:
+        return Response({'error': 'No photo file provided'}, status=400)
+
+    # Guardar la foto usando .save() para que se sobrescriba
+    candidate.photo.save(
+        request.FILES['photo'].name, 
+        request.FILES['photo'], 
+        save=True
+    )
+
+    serializer = CandidateSerializer(candidate, context={'request': request})
+    return Response(serializer.data, status=200)
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8  # millas
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi, dlambda = radians(lat2-lat1), radians(lon2-lon1)
+    a = sin(dphi/2)**2 + cos(phi1)*cos(phi2)*sin(dlambda/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def list_job(request):
+    data = request.data
+
+    # Si el JSON está vacío o todos los filtros son None/'none', devolver vacíos
+    if not data or all(
+        value is None or (isinstance(value, str) and value.lower() == 'none')
+        for key, value in data.items()
+        if key in ['title', 'location', 'employment_type', 'modality', 'job_type', 'qualifications', 'salary', 'radius_miles']
+    ):
+        return Response({"jobs": []}, status=status.HTTP_200_OK)
+
+    title = data.get('title')
+    location = data.get('location')
+    employment_type = data.get('employment_type')
+    modality = data.get('modality')
+    job_type = data.get('job_type')
+    qualifications = data.get('qualifications')
+    salary_max = data.get('salary')
+    radius_miles = data.get('radius_miles', 350)  # valor por defecto 350 millas
+    try:
+        radius_miles = float(radius_miles)
+    except (ValueError, TypeError):
+        return Response({"message": "radius_miles debe ser un número"}, status=status.HTTP_400_BAD_REQUEST)
+
+    jobs = Job.objects.filter(is_active=1)
+
+    # ---------------------
+    # Filtros de string
+    # ---------------------
+    if title and isinstance(title, str) and title.lower() != 'none':
+        jobs = jobs.filter(title__icontains=title)
+    if employment_type and isinstance(employment_type, str) and employment_type.lower() != 'none':
+        jobs = jobs.filter(employment_type__iexact=employment_type)
+    if job_type and isinstance(employment_type, str) and job_type.lower() != 'none':
+        jobs = jobs.filter(employment_type__iexact=job_type)
+    if modality and isinstance(modality, str) and modality.lower() != 'none':
+        jobs = jobs.filter(modality__iexact=modality)
+    if qualifications and isinstance(qualifications, str) and qualifications.lower() != 'none':
+        jobs = jobs.filter(qualifications__icontains=qualifications)
+    if salary_max is not None:
+        try:
+            salary_max = float(salary_max)
+            jobs = jobs.extra(where=["CAST(salary AS DECIMAL) <= %s"], params=[salary_max])
+        except ValueError:
+            return Response({"message": "salary debe ser un número"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # ---------------------
+    # Filtrar por distancia usando lat/lng
+    # ---------------------
+    filtered_jobs = []
+    if location and isinstance(location, str) and location.lower() != 'none':
+        # buscar coordenadas de la ciudad de referencia
+        try:
+            from geopy.geocoders import Nominatim
+            import time
+            geolocator = Nominatim(user_agent="PHC_backend_list_job")
+            city_loc = geolocator.geocode(location, timeout=10)
+            time.sleep(2)
+            if not city_loc:
+                return Response({"message": "Ciudad no encontrada"}, status=status.HTTP_400_BAD_REQUEST)
+            city_lat, city_lng = city_loc.latitude, city_loc.longitude
+        except Exception as e:
+            return Response({"message": f"Error obteniendo coordenadas de la ciudad: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # recorrer jobs y calcular distancia
+        for job in jobs:
+            if job.latitude is not None and job.longitude is not None:
+                dist = haversine(city_lat, city_lng, job.latitude, job.longitude)
+                if dist <= radius_miles:
+                    filtered_jobs.append(job)
+
+        jobs = filtered_jobs
+
+    serializer = JobSerializer(jobs, many=True)
+    jobs_data = serializer.data
+
+    for job in jobs_data:
+        company_id = job.get("company")
+        if company_id:
+            try:
+                company = Company.objects.get(id_company=company_id)
+                job["company"] = CompanySerializer(
+                    company, 
+                    context={'request': request}  # ⬅️ IMPORTANTE PARA URL COMPLETA
+                ).data
+            except Company.DoesNotExist:
+                job["company"] = None
+
+    return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_last_jobs(request):
+    desired_position = request.data.get('desired_position', None)
+
+    jobs = Job.objects.filter(is_active=1)
+
+    if desired_position and desired_position.lower() != 'none':
+        jobs = jobs.filter(title__icontains=desired_position)
+
+    jobs = jobs.order_by('-created_at')[:5]
+
+    serializer = JobSerializer(jobs, many=True)
+    return Response({"jobs": serializer.data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_company(request):
+    company_id = request.data.get('company_id')
+    
+    if not company_id:
+        return Response({"message": "company_id es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        company = Company.objects.get(id_company=company_id)
+    except Company.DoesNotExist:
+        return Response({"message": "Company no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = CompanySerializer(company)
+    return Response({"company": serializer.data}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def my_applications(request):
+    id_candidate = request.data.get("id_candidate")
+
+    if not id_candidate:
+        return Response({"message": "id_candidate es requerido"}, status=400)
+
+    # Obtener todas las aplicaciones del candidato
+    applications = JobApplication.objects.filter(
+        id_candidate=id_candidate
+    ).order_by("-created_at")  # último al primero
+
+    result = []
+
+    for app in applications:
+        job = app.id_jobs
+
+        # Serializar el job
+        job_data = JobSerializer(job).data
+
+        # Agregar la compañía al job (como ya lo haces)
+        company = job.company
+        job_data["company"] = CompanySerializer(
+            company,
+            context={"request": request}
+        ).data
+
+        # Construir el objeto final de la aplicación
+        result.append({
+            "id_job_application": app.id_job_application,
+            "status": app.status,
+            "created_at": app.created_at,
+            "updated_at": app.updated_at,
+            "job": job_data
+        })
+
+    return Response({"applications": result}, status=200)

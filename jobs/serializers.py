@@ -21,7 +21,7 @@ class JobSerializer(serializers.ModelSerializer):
         fields = [
             'id_jobs',
             'company',
-            'type',
+            'job_type',
             'title',
             'location',
             'salary',
@@ -37,7 +37,6 @@ class JobSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'auto_close',
-            'contract_type',
             'skills',
             'schedules'
         ]

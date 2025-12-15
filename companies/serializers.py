@@ -13,7 +13,7 @@ class CompanySerializer(serializers.ModelSerializer):
             'id_company', 'name', 'account', 'address', 'type_business',
             'primary_contact', 'title_pc', 'phone_number_pc', 'email_pc',
             'secondary_contact', 'title_sc', 'phone_number_sc', 'email_sc',
-            'description', 'link'
+            'description', 'link', 'logo'
         ]
 
     def create(self, validated_data):
@@ -37,3 +37,10 @@ class CompanySerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+    def get_logo_url(self, obj):
+        request = self.context.get('request')
+        if obj.logo and hasattr(obj.logo, 'url'):
+            # Construye la URL absoluta usando el request
+            return request.build_absolute_uri(obj.logo.url)
+        return None

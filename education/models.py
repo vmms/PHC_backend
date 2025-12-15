@@ -6,6 +6,7 @@ class Education(models.Model):
     education = models.CharField(max_length=100)
     graduation_year = models.CharField(max_length=10)
     institute = models.CharField(max_length=100)
+    education_field = models.CharField(max_length=150)
 
     class Meta:
         db_table = 'education'

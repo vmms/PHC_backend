@@ -12,7 +12,9 @@ from collections import defaultdict
 
 from skills.models import Skill
 from schedulers.models import Scheduler
+from geopy.geocoders import Nominatim
 
+import time
 
 def _company_for_user(user):
     try:
@@ -153,8 +155,6 @@ def create_job(request):
         for item in data["skills"]:
             if "skill" in item and item["skill"]:
                 skill_names.append(item["skill"].strip())
-
-    # El serializer NO maneja skills directamente
     data["skills"] = []
 
     # ===========================================
@@ -167,6 +167,28 @@ def create_job(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     job = serializer.save(company=company)
+
+    # ===========================================
+    #   GENERAR LATITUD Y LONGITUD
+    # ===========================================
+    try:
+        geolocator = Nominatim(user_agent="PHC_backend_job_creation")
+        loc = geolocator.geocode(job.location, timeout=10)
+        time.sleep(2)  # para evitar bloqueos de Nominatim
+        if loc:
+            job.latitude = loc.latitude
+            job.longitude = loc.longitude
+            job.save(update_fields=["latitude", "longitude"])
+        else:
+            job.latitude = None
+            job.longitude = None
+            job.save(update_fields=["latitude", "longitude"])
+    except Exception as e:
+        # en caso de error, dejamos lat/lng como None
+        job.latitude = None
+        job.longitude = None
+        job.save(update_fields=["latitude", "longitude"])
+        print(f"Error geocoding job {job.title}: {e}")
 
     # ===========================================
     #   PROCESAR SKILLS (buscar o crear)
@@ -193,8 +215,8 @@ def create_job(request):
             for item in sch["multiple"]:
                 scheduler = Scheduler.objects.create(
                     type="multiple",
-                    day=None,                     # varchar(3), no aplica
-                    date_start=item.get("date_start"),  # usamos date_start del JSON
+                    day=None,
+                    date_start=item.get("date_start"),
                     date_end=None,
                     time_start=item.get("time_start"),
                     time_finish=item.get("time_end")

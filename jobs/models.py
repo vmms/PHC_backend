@@ -17,10 +17,10 @@ class Job(models.Model):
         db_column='company_id'
     )
 
-    type = models.CharField(max_length=45, null=True, blank=True)
+    job_type = models.CharField(max_length=60, null=True, blank=True)
     title = models.CharField(max_length=100)
     location = models.CharField(max_length=100)
-    salary = models.CharField(max_length=45)
+    salary = models.CharField(max_length=75)
     experience = models.CharField(max_length=45)
 
     employment_type = models.CharField(max_length=45)
@@ -31,8 +31,8 @@ class Job(models.Model):
 
     # Nuevos según JSON
     qualifications = models.TextField(null=True, blank=True)
-    oportunity = models.CharField(max_length=200, null=True, blank=True)
-    other = models.CharField(max_length=200, null=True, blank=True)
+    oportunity = models.CharField(max_length=400, null=True, blank=True)
+    other = models.CharField(max_length=400, null=True, blank=True)
 
     # Control
     is_active = models.BooleanField(default=True)
@@ -41,7 +41,9 @@ class Job(models.Model):
     updated_at = models.DateTimeField(auto_now=True, db_column='updated_at')
 
     auto_close = models.BooleanField(default=False)
-    contract_type = models.CharField(max_length=15, null=True, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
 
     class Meta:
         db_table = 'jobs'

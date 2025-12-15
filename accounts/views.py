@@ -19,14 +19,23 @@ def list_accounts(request):
     serializer = AccountSerializer(accounts, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['POST'])
 @permission_classes([])
 def create_account(request):
+    username = request.data.get('user')  # <-- tu campo es 'user'
+
+    # Verificar si el usuario ya existe
+    if Account.objects.filter(user=username).exists():
+        return Response(
+            {"detail": "This username is already in use."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     serializer = AccountSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -3,6 +3,26 @@ from accounts.models import Account
 from addresses.models import Address
 from education.models import Education
 
+from schedulers.models import Scheduler
+
+from django.utils.deconstruct import deconstructible
+from django.conf import settings
+import os
+
+@deconstructible
+class PhotoProfilePath:
+    def __call__(self, instance, filename):
+        ext = filename.split('.')[-1]
+        filename = f'photo_user_{instance.id_candidate}.{ext}'
+        full_path = os.path.join('photos_profiles', filename)
+        
+        # Borrar archivo existente antes de guardar
+        absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
+        if os.path.exists(absolute_path):
+            os.remove(absolute_path)
+        
+        return full_path
+
 class Candidate(models.Model):
     id_candidate = models.AutoField(primary_key=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
@@ -17,6 +37,16 @@ class Candidate(models.Model):
     work_permission = models.BooleanField(default=True)
     web_link = models.CharField(max_length=100, null=True, blank=True)
     about = models.TextField(null=True, blank=True)
+    photo = models.ImageField(upload_to=PhotoProfilePath(), null=True, blank=True)
+    desired_position = models.CharField(max_length=100, null=True, blank=True)
+    years_experience = models.IntegerField(null=True, blank=True)
+    last_position = models.CharField(max_length=100, null=True, blank=True)
+    last_company = models.CharField(max_length=100, null=True, blank=True)
+    email = models.CharField(max_length=100, null=True, blank=True)
+    job_type = models.CharField(max_length=45, null=True, blank=True)
+    employment_type = models.CharField(max_length=45, null=True, blank=True)
+    modality = models.CharField(max_length=45, null=True, blank=True)
+    salary = models.CharField(max_length=75)
 
     class Meta:
         db_table = "candidate"
@@ -24,3 +54,21 @@ class Candidate(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+class CandidateHasSchedule(models.Model):
+    candidate = models.ForeignKey(
+        'Candidate',
+        on_delete=models.CASCADE,
+        db_column='candidate_id',
+        primary_key=True,
+    )
+    schedule = models.ForeignKey(
+        Scheduler,
+        on_delete=models.CASCADE,
+        db_column='schedule_id'
+    )
+
+    class Meta:
+        db_table = 'candidate_has_schedule'
+        managed = False
+        unique_together = (('candidate', 'schedule'),)
