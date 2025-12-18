@@ -7,10 +7,15 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import Company
 from .serializers import CompanySerializer
+from collections import defaultdict
 
-from jobs.models import Job
+from jobs.models import Job, SkillsHasJobs, ScheduleHasJobs
+from jobs.serializers import JobSerializer
 from jobApplication.models import JobApplication
 from jobApplication.serializers import JobApplicationSerializer
+
+from geopy.geocoders import Nominatim
+from math import radians, sin, cos, sqrt, atan2
 
 
 @api_view(['GET'])
@@ -134,7 +139,8 @@ def list_my_job_applications(request):
                     "id_candidate": app.id_candidate.id_candidate,
                     "candidate_name": f"{app.id_candidate.first_name} {app.id_candidate.last_name}",
                     "status": app.status,
-                    "created_at": app.created_at
+                    "created_at": app.created_at.date() if app.created_at else None,
+                    "updated_at": app.updated_at.date() if app.updated_at else None,
                 })
 
             jobs_data.append({
@@ -156,3 +162,174 @@ def list_my_job_applications(request):
             {"error": "Unexpected error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8  # millas
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi, dlambda = radians(lat2-lat1), radians(lon2-lon1)
+    a = sin(dphi/2)**2 + cos(phi1)*cos(phi2)*sin(dlambda/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def list_my_jobs(request):
+    data = request.data or {}
+
+    # -----------------------------------
+    # 1. Obtener company desde account
+    # -----------------------------------
+    try:
+        company = Company.objects.get(account_id=request.user.id_account)
+    except Company.DoesNotExist:
+        return Response(
+            {"message": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # -----------------------------------
+    # 2. Base queryset
+    # -----------------------------------
+    jobs = Job.objects.filter(company_id=company.id_company)
+
+    # -----------------------------------
+    # 3. Filtros simples
+    # -----------------------------------
+    title = data.get('title')
+    location = data.get('location')
+    employment_type = data.get('employment_type')
+    modality = data.get('modality')
+    job_type = data.get('job_type')
+    qualifications = data.get('qualifications')
+    radius_miles = data.get('radius_miles', 350)
+    is_active_filter = data.get('is_active')
+
+    if is_active_filter is None:
+        jobs = jobs.filter(is_active=1)
+    elif isinstance(is_active_filter, str):
+        if is_active_filter.lower() == "active":
+            jobs = jobs.filter(is_active=1)
+        elif is_active_filter.lower() == "disable":
+            jobs = jobs.filter(is_active=0)
+
+    if title and isinstance(title, str) and title.lower() != 'none':
+        jobs = jobs.filter(title__icontains=title)
+
+    if employment_type and isinstance(employment_type, str) and employment_type.lower() != 'none':
+        jobs = jobs.filter(employment_type__iexact=employment_type)
+
+    if job_type and isinstance(job_type, str) and job_type.lower() != 'none':
+        jobs = jobs.filter(job_type__iexact=job_type)
+
+    if modality and isinstance(modality, str) and modality.lower() != 'none':
+        jobs = jobs.filter(modality__iexact=modality)
+
+    if qualifications and isinstance(qualifications, str) and qualifications.lower() != 'none':
+        jobs = jobs.filter(qualifications__icontains=qualifications)
+    
+    jobs = jobs.order_by('-created_at')
+
+    # -----------------------------------
+    # 4. Filtro por ubicación (IGUAL que list_job)
+    # -----------------------------------
+    if location and isinstance(location, str) and location.lower() != 'none':
+        try:
+            from geopy.geocoders import Nominatim
+            import time
+
+            geolocator = Nominatim(user_agent="PHC_backend_list_my_jobs")
+            city_loc = geolocator.geocode(location, timeout=10)
+            time.sleep(2)
+
+            if not city_loc:
+                return Response(
+                    {"message": "Ciudad no encontrada"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            city_lat, city_lng = city_loc.latitude, city_loc.longitude
+            radius_miles = float(radius_miles)
+
+        except Exception as e:
+            return Response(
+                {"message": f"Error obteniendo coordenadas: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        filtered_jobs = []
+        for job in jobs:
+            if job.latitude is not None and job.longitude is not None:
+                dist = haversine(city_lat, city_lng, job.latitude, job.longitude)
+                if dist <= radius_miles:
+                    filtered_jobs.append(job)
+
+        jobs = filtered_jobs
+
+    # -----------------------------------
+    # 5. Respuesta
+    # -----------------------------------
+    serializer = JobSerializer(jobs, many=True)
+    jobs_data = serializer.data
+
+    for job_data in jobs_data:
+        job_id = job_data.get("id_jobs")
+
+        try:
+            job_obj = Job.objects.get(id_jobs=job_id)
+        except Job.DoesNotExist:
+            job_data["skills"] = []
+            job_data["schedule"] = []
+            continue
+
+        # ----------------------------
+        # Skills
+        # ----------------------------
+        skill_links = SkillsHasJobs.objects.filter(jobs=job_obj).select_related('skills')
+        job_data["skills"] = [
+            {
+                "id_skills": link.skills.id_skills,
+                "name": link.skills.name
+            }
+            for link in skill_links
+        ]
+
+        # ----------------------------
+        # Schedule
+        # ----------------------------
+        temp_schedule = defaultdict(list)
+
+        for link in ScheduleHasJobs.objects.filter(jobs=job_obj).select_related('schedule'):
+            sched = link.schedule
+
+            if sched.type == "permanent":
+                temp_schedule["permanent"].append({
+                    "day": getattr(sched, "day", None),
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+            elif sched.type == "range":
+                temp_schedule["range"].append({
+                    "date_start": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                    "date_end": sched.date_end.strftime("%Y-%m-%d") if sched.date_end else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+            elif sched.type == "multiple":
+                temp_schedule["multiple"].append({
+                    "date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+        schedule_data = []
+        for sched_type, items in temp_schedule.items():
+            schedule_data.append({
+                "type": sched_type,
+                "dates" if sched_type == "multiple" else "days": items
+            })
+
+        job_data["schedule"] = schedule_data
+
+    return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)

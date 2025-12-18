@@ -9,4 +9,5 @@ urlpatterns = [
     path('delete/<int:pk>/', views.delete_company, name='delete_company'),
     path('upload_image/', views.upload_company_logo, name='upload_company_logo'),
     path('my_applications/', views.list_my_job_applications, name='list_my_job_applications'),
+    path('list_my_jobs/', views.list_my_jobs, name='list_my_jobs'),
 ]

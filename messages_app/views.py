@@ -14,7 +14,8 @@ from accounts.models import Account
 @permission_classes([IsAuthenticated])
 def create_message(request):
     user_account = request.user  # Account logueado
-    account_type = user_account.subscription  # basic, compani, premium
+    account_type = user_account.subscription  # candidate, company, premium
+    print("user_account:",user_account.id_account)
 
     receiver_candidate_id = request.data.get("receiver_candidate_id")
     receiver_company_id = request.data.get("receiver_company_id")
@@ -26,7 +27,7 @@ def create_message(request):
     # -------------------------------------------------------
     # Determinar receiver_account_id según tipo de cuenta
     # -------------------------------------------------------
-    if account_type == "basic":  # candidato enviando a empresa
+    if account_type == "candidate":  # candidato enviando a empresa
         if not receiver_company_id:
             return Response({"error": "Must send receiver_company_id"}, status=400)
         try:
@@ -35,11 +36,11 @@ def create_message(request):
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=404)
 
-    elif account_type in ["companie", "premium"]:  # empresa enviando a candidato
+    elif account_type in ["company", "premium"]:  # empresa enviando a candidato
         if not receiver_candidate_id:
             return Response({"error": "Must send receiver_candidate_id"}, status=400)
         try:
-            candidate = Candidate.objects.get(account_id=receiver_candidate_id)
+            candidate = Candidate.objects.get(id_candidate=receiver_candidate_id)
             receiver_account_id = candidate.account_id
         except Candidate.DoesNotExist:
             return Response({"error": "Candidate not found"}, status=404)
@@ -82,51 +83,42 @@ def create_message(request):
 def list_chats(request):
     user_account = request.user
 
-    # Obtener los IDs de los chat partners
     chat_partners_ids = (
-        Message.objects.filter(sender_account=user_account).values_list('receiver_account', flat=True)
+        Message.objects.filter(sender_account_id=user_account.id_account)
+        .values_list('receiver_account_id', flat=True)
         .union(
-            Message.objects.filter(receiver_account=user_account).values_list('sender_account', flat=True)
+            Message.objects.filter(receiver_account_id=user_account.id_account)
+            .values_list('sender_account_id', flat=True)
         )
     )
 
     result = []
     for acc_id in chat_partners_ids:
-        try:
-            acc = Account.objects.get(id_account=acc_id)
-            
-            # Verificar si hay mensajes no leídos de este partner hacia mí
-            unread_count = Message.objects.filter(
-                sender_account_id=acc_id,
-                receiver_account=user_account.id_account,
-                status=0
-            ).count()
+        unread_count = Message.objects.filter(
+            sender_account_id=acc_id,
+            receiver_account_id=user_account.id_account,
+            status=0
+        ).count()
 
-            has_unread = unread_count > 0
+        has_unread = unread_count > 0
 
-            if user_account.subscription == 'basic':  # usuario básico → empresas
-                company = Company.objects.get(account_id=acc_id)
-                result.append({
-                    "company_id": company.account_id,
-                    "company_name": company.name,
-                    "has_unread": has_unread
-                })
-            else:  # empresa → candidatos
-                candidate = Candidate.objects.get(account_id=acc_id)
-                result.append({
-                    "candidate_id": candidate.account_id,
-                    "candidate_name": f"{candidate.first_name} {candidate.last_name}",
-                    "has_unread": has_unread
-                })
-
-        except Account.DoesNotExist:
-            continue
-        except Candidate.DoesNotExist:
-            continue
-        except Company.DoesNotExist:
-            continue
+        if user_account.subscription == 'candidate':
+            company = Company.objects.get(account_id=acc_id)
+            result.append({
+                "company_id": company.id_company,  # 👈 mejor que account_id
+                "company_name": company.name,
+                "has_unread": has_unread
+            })
+        else:
+            candidate = Candidate.objects.get(account_id=acc_id)
+            result.append({
+                "candidate_id": candidate.id_candidate,
+                "candidate_name": f"{candidate.first_name} {candidate.last_name}",
+                "has_unread": has_unread
+            })
 
     return Response(result, status=200)
+
 
 
 # ---------------------------------------------------------

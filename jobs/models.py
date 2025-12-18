@@ -21,7 +21,7 @@ class Job(models.Model):
     title = models.CharField(max_length=100)
     location = models.CharField(max_length=100)
     salary = models.CharField(max_length=75)
-    experience = models.CharField(max_length=45)
+    experience = models.CharField(max_length=250)
 
     employment_type = models.CharField(max_length=45)
     modality = models.CharField(max_length=45)

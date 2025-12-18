@@ -8,7 +8,7 @@ from .models import Candidate, CandidateHasSchedule
 from .serializers import CandidateSerializer
 from collections import defaultdict
 
-from jobs.models import Job
+from jobs.models import Job, SkillsHasJobs, ScheduleHasJobs
 from jobs.serializers import JobSerializer
 from jobApplication.models import JobApplication
 from schedulers.models import Scheduler
@@ -402,19 +402,83 @@ def list_job(request):
     serializer = JobSerializer(jobs, many=True)
     jobs_data = serializer.data
 
-    for job in jobs_data:
-        company_id = job.get("company")
+    for job_data in jobs_data:
+        job_id = job_data.get("id_jobs")
+
+        try:
+            job_obj = Job.objects.get(id_jobs=job_id)
+        except Job.DoesNotExist:
+            job_data["skills"] = []
+            job_data["schedule"] = []
+            continue
+
+        # ------------------------------------------------------
+        # Skills
+        # ------------------------------------------------------
+        skill_links = SkillsHasJobs.objects.filter(jobs=job_obj).select_related('skills')
+        job_data["skills"] = [
+            {
+                "id_skills": link.skills.id_skills,
+                "name": link.skills.name
+            }
+            for link in skill_links
+        ]
+
+        # ------------------------------------------------------
+        # Schedule
+        # ------------------------------------------------------
+        temp_schedule = defaultdict(list)
+
+        for link in ScheduleHasJobs.objects.filter(jobs=job_obj).select_related('schedule'):
+            sched = link.schedule
+
+            if sched.type == "permanent":
+                temp_schedule["permanent"].append({
+                    "day": getattr(sched, "day", None),
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+            elif sched.type == "range":
+                temp_schedule["range"].append({
+                    "date_start": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                    "date_end": sched.date_end.strftime("%Y-%m-%d") if sched.date_end else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+            elif sched.type == "multiple":
+                temp_schedule["multiple"].append({
+                    "date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+        schedule_data = []
+        for sched_type, items in temp_schedule.items():
+            schedule_data.append({
+                "type": sched_type,
+                "dates" if sched_type == "multiple" else "days": items
+            })
+
+        job_data["schedule"] = schedule_data
+
+        # ------------------------------------------------------
+        # Company (lo que ya tenías)
+        # ------------------------------------------------------
+        company_id = job_data.get("company")
         if company_id:
             try:
                 company = Company.objects.get(id_company=company_id)
-                job["company"] = CompanySerializer(
-                    company, 
-                    context={'request': request}  # ⬅️ IMPORTANTE PARA URL COMPLETA
+                job_data["company"] = CompanySerializer(
+                    company,
+                    context={'request': request}
                 ).data
             except Company.DoesNotExist:
-                job["company"] = None
+                job_data["company"] = None
 
     return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -481,8 +545,8 @@ def my_applications(request):
         result.append({
             "id_job_application": app.id_job_application,
             "status": app.status,
-            "created_at": app.created_at,
-            "updated_at": app.updated_at,
+            "created_at": app.created_at.date() if app.created_at else None,
+            "updated_at": app.updated_at.date() if app.updated_at else None,
             "job": job_data
         })
 

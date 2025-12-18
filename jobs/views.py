@@ -108,23 +108,27 @@ def get_job(request):
     # Armar el JSON final
     # ------------------------------------------------------
     response_data = {
-        "type": job.type,
         "title": job.title,
         "location": job.location,
-        "salary": job.salary,
-        "experience": job.experience,
+        "job_type": job.job_type,
         "employment_type": job.employment_type,
         "modality": job.modality,
-        "benefits": job.benefits,
+        "experience": job.experience,
+
         "description": job.description,
-        "is_active": job.is_active,
-        "auto_close": job.auto_close,
-        "contract_type": job.contract_type,
         "qualifications": job.qualifications,
+
+        "salary": job.salary,
+        "benefits": job.benefits,
         "oportunity": job.oportunity,
         "other": job.other,
+
+        "is_active": job.is_active,
+        "auto_close": job.auto_close,
+
+        # estos NO se tocan
         "skills": skills_list,
-        "schedule": schedule_data  
+        "schedule": schedule_data,
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
@@ -303,16 +307,63 @@ def update_job(request):
 def delete_job(request):
     job_id = request.data.get('id_jobs')
     if not job_id:
-        return Response({'message': 'id_jobs is required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'message': 'id_jobs is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
         job = Job.objects.get(id_jobs=job_id)
     except Job.DoesNotExist:
-        return Response({'message': 'Job not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {'message': 'Job not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     company = _company_for_user(request.user)
     if not company or job.company_id != company.id_company:
-        return Response({'message': 'Not owner of the job'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {'message': 'Not owner of the job'},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
-    job.delete()
-    return Response({'message': 'Job deleted successfully'}, status=status.HTTP_200_OK)
+    job.is_active = False
+    job.save(update_fields=['is_active'])
+
+    return Response(
+        {'message': 'Job deactivated successfully'},
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def activate_job(request):
+    job_id = request.data.get('id_jobs')
+    if not job_id:
+        return Response(
+            {'message': 'id_jobs is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        job = Job.objects.get(id_jobs=job_id)
+    except Job.DoesNotExist:
+        return Response(
+            {'message': 'Job not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    company = _company_for_user(request.user)
+    if not company or job.company_id != company.id_company:
+        return Response(
+            {'message': 'Not owner of the job'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    job.is_active = True
+    job.save(update_fields=['is_active'])
+
+    return Response(
+        {'message': 'Job activated successfully'},
+        status=status.HTTP_200_OK
+    )
