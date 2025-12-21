@@ -3,6 +3,7 @@ from .models import Candidate, CandidateHasSchedule
 from addresses.models import Address
 from education.models import Education
 from addresses.serializers import AddressSerializer
+from addresses.serializers import AddressPublicSerializer
 from education.serializers import EducationSerializer
 
 
@@ -18,7 +19,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             'address', 'education', 'status', 'radius', 'adult', 'work_permission',
             'web_link', 'about', 'photo', 'desired_position', 'years_experience', 
             'last_position', 'last_company','email', 'job_type', 'employment_type', 
-            'modality','salary'
+            'modality','salary', 'cvu'
         ]
 
     def create(self, validated_data):
@@ -100,3 +101,38 @@ class CandidateSerializer(serializers.ModelSerializer):
             # Si no hay request, regresa solo la URL relativa
             return obj.photo.url
         return None
+
+class CandidatePublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Candidate
+        fields = [
+            'id_candidate',
+            'first_name',
+            'last_name',
+            'desired_position',
+            'years_experience',
+            'last_position',
+            'last_company',
+            'job_type',
+            'employment_type',
+            'modality',
+            'salary',
+            'photo',
+            'about',
+        ]
+
+class CandidateContactSerializer(serializers.ModelSerializer):
+    address = AddressPublicSerializer(read_only=True)
+
+    class Meta:
+        model = Candidate
+        fields = [
+            'id_candidate',
+            'first_name',
+            'last_name',
+
+            # ---- contacto ----
+            'email',
+            'phone_number',
+            'address',
+        ]

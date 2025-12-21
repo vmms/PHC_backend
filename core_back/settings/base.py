@@ -29,12 +29,12 @@ DEBUG = False    # cada ambiente lo cambia
 ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
-    'dada95d14c52.ngrok-free.app'
+    '43efbffe3ff3.ngrok-free.app'
     ]
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://dada95d14c52.ngrok-free.app", 
+    "https://43efbffe3ff3.ngrok-free.app", 
     "https://ruthe-unretributive-superscientifically.ngrok-free.dev",
     ]
 

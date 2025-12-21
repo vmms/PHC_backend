@@ -13,4 +13,6 @@ urlpatterns = [
     path('list_last_jobs/', views.list_last_jobs, name='list_last_jobs'),
     path('get_company/', views.get_company, name='get_company'),
     path('my_applications/', views.my_applications, name='my_applications'),
+    path('load_cvu/', views.load_cvu, name='load_cvu'),
+    path('download_cvu/', views.download_cvu, name='download_cvu'),
 ]

@@ -23,6 +23,19 @@ class PhotoProfilePath:
         
         return full_path
 
+@deconstructible
+class CVUPath:
+    def __call__(self, instance, filename):
+        filename = f'cvu_user_{instance.id_candidate}.pdf'
+        full_path = os.path.join('cvu_files', filename)
+
+        # Borrar CVU existente antes de guardar
+        absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
+        if os.path.exists(absolute_path):
+            os.remove(absolute_path)
+
+        return full_path
+
 class Candidate(models.Model):
     id_candidate = models.AutoField(primary_key=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
@@ -38,6 +51,7 @@ class Candidate(models.Model):
     web_link = models.CharField(max_length=100, null=True, blank=True)
     about = models.TextField(null=True, blank=True)
     photo = models.ImageField(upload_to=PhotoProfilePath(), null=True, blank=True)
+    cvu = models.FileField(upload_to=CVUPath(), null=True, blank=True)
     desired_position = models.CharField(max_length=100, null=True, blank=True)
     years_experience = models.IntegerField(null=True, blank=True)
     last_position = models.CharField(max_length=100, null=True, blank=True)

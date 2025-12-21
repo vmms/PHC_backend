@@ -8,11 +8,14 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Company
 from .serializers import CompanySerializer
 from collections import defaultdict
+from django.shortcuts import get_object_or_404
 
 from jobs.models import Job, SkillsHasJobs, ScheduleHasJobs
 from jobs.serializers import JobSerializer
 from jobApplication.models import JobApplication
 from jobApplication.serializers import JobApplicationSerializer
+from candidates.models import Candidate, CandidateHasSchedule
+from candidates.serializers import CandidatePublicSerializer, CandidateContactSerializer
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
@@ -333,3 +336,90 @@ def list_my_jobs(request):
         job_data["schedule"] = schedule_data
 
     return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_candidate_public(request):
+    id_candidate = request.data.get('id_candidate')
+
+    if not id_candidate:
+        return Response(
+            {'error': 'id_candidate is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    candidate = get_object_or_404(
+        Candidate,
+        id_candidate=id_candidate
+    )
+
+    # -----------------------------
+    # Schedule (misma lógica)
+    # -----------------------------
+    temp_schedule = defaultdict(list)
+
+    for link in CandidateHasSchedule.objects.filter(candidate=candidate).select_related('schedule'):
+        sched = link.schedule
+
+        if sched.type == "permanent":
+            temp_schedule["permanent"].append({
+                "day": getattr(sched, "day", None),
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None,
+                "hired_date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None
+            })
+
+        elif sched.type == "range":
+            temp_schedule["range"].append({
+                "date_start": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                "date_end": sched.date_end.strftime("%Y-%m-%d") if sched.date_end else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+
+        elif sched.type == "multiple":
+            temp_schedule["multiple"].append({
+                "date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None,
+                "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+            })
+
+    schedule_data = []
+    for sched_type, items in temp_schedule.items():
+        schedule_data.append({
+            "type": sched_type,
+            "dates" if sched_type == "multiple" else "days": items
+        })
+
+    serializer = CandidatePublicSerializer(
+        candidate,
+        context={'request': request}
+    )
+
+    response_data = serializer.data
+    response_data["schedule"] = schedule_data
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_candidate_contact_info(request):
+    id_candidate = request.data.get('id_candidate')
+
+    if not id_candidate:
+        return Response(
+            {'error': 'id_candidate is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    candidate = get_object_or_404(
+        Candidate,
+        id_candidate=id_candidate
+    )
+
+    serializer = CandidateContactSerializer(
+        candidate,
+        context={'request': request}
+    )
+
+    return Response(serializer.data, status=status.HTTP_200_OK)

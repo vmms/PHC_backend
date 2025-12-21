@@ -17,6 +17,9 @@ from companies.serializers import CompanySerializer
 
 from django.utils.deconstruct import deconstructible
 from django.conf import settings
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+
 import os
 import time
 
@@ -313,8 +316,10 @@ def upload_photo(request):
         save=True
     )
 
-    serializer = CandidateSerializer(candidate, context={'request': request})
-    return Response(serializer.data, status=200)
+    return Response(
+        {"message": "Your profile photo has been updated successfully"},
+        status=200
+    )
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 3958.8  # millas
@@ -551,3 +556,89 @@ def my_applications(request):
         })
 
     return Response({"applications": result}, status=200)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def load_cvu(request):
+    id_candidate = request.data.get('id_candidate')
+    if not id_candidate:
+        return Response(
+            {'error': 'id_candidate is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        candidate = Candidate.objects.get(id_candidate=id_candidate)
+    except Candidate.DoesNotExist:
+        return Response(
+            {'error': 'Candidate not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if 'cvu' not in request.FILES:
+        return Response(
+            {'error': 'No CVU file provided'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    cvu_file = request.FILES['cvu']
+
+    # -----------------------------
+    # Validar que sea PDF
+    # -----------------------------
+    if cvu_file.content_type != 'application/pdf':
+        return Response(
+            {'error': 'Only PDF files are allowed'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not cvu_file.name.lower().endswith('.pdf'):
+        return Response(
+            {'error': 'File extension must be .pdf'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # -----------------------------
+    # Guardar / sobrescribir CVU
+    # -----------------------------
+    candidate.cvu.save(
+        cvu_file.name,
+        cvu_file,
+        save=True
+    )
+
+    return Response(
+        {"message": "Your CV file has been updated"}, 
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def download_cvu(request):
+    id_candidate = request.data.get('id_candidate')
+
+    if not id_candidate:
+        return Response(
+            {'error': 'id_candidate is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    candidate = get_object_or_404(Candidate,id_candidate=id_candidate)
+
+    if not candidate.cvu:
+        return Response({'error': 'CVU not found'},status=status.HTTP_404_NOT_FOUND)
+
+    file_path = candidate.cvu.path
+
+    if not os.path.exists(file_path):
+        return Response({'error': 'File does not exist'},status=status.HTTP_404_NOT_FOUND)
+
+    # Nombre amigable (sale DIRECTO de la tabla candidate)
+    download_name = f'{candidate.first_name}_{candidate.last_name}_CV.pdf'
+
+    response = FileResponse(open(file_path, 'rb'),content_type='application/pdf')
+
+    response['Content-Disposition'] = (f'attachment; filename="{download_name}"')
+
+    return response
