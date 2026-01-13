@@ -5,7 +5,18 @@ from django.contrib.auth.hashers import check_password
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
-        fields = '__all__'
+        fields = [
+            'id_account',
+            'status',
+            'user',
+            'email',
+            'password',
+            'subscription'
+        ]
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': False},
+            'email': {'required': False}
+        }
 
 class AccountLoginSerializer(serializers.Serializer):
     user = serializers.CharField()

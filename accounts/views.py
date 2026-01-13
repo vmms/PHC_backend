@@ -1,4 +1,3 @@
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -22,9 +21,14 @@ def list_accounts(request):
 @api_view(['POST'])
 @permission_classes([])
 def create_account(request):
-    username = request.data.get('user')  # <-- tu campo es 'user'
+    username = request.data.get('user')
 
-    # Verificar si el usuario ya existe
+    if not username:
+        return Response(
+            {"detail": "User is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     if Account.objects.filter(user=username).exists():
         return Response(
             {"detail": "This username is already in use."},
@@ -35,8 +39,155 @@ def create_account(request):
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([])
+def google_register(request):
+    token = request.data.get('token')
+
+    if not token:
+        return Response(
+            {"detail": "Google token required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validar token con Google
+    r = requests.get(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    if r.status_code != 200:
+        return Response(
+            {"detail": "Invalid Google token"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    data = r.json()
+
+    email = data.get('email')
+    google_id = data.get('sub')
+
+    if not email:
+        return Response(
+            {"detail": "Google account has no email"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    account = Account.objects.filter(email=email).first()
+
+    if not account:
+        # CREAR CUENTA NUEVA
+        account = Account.objects.create(
+            user=email,
+            email=email,
+            google_id=google_id,
+            password=None,
+            status=1,
+            subscription='free'
+        )
+    else:
+        # VINCULAR GOOGLE SI YA EXISTÍA
+        if not account.google_id:
+            account.google_id = google_id
+            account.save()
+
+    # GENERAR TOKENS (MISMO SISTEMA)
+    refresh = RefreshToken()
+    refresh.set_exp(lifetime=timedelta(days=7))
+    refresh['id_account'] = account.id_account
+    refresh['user'] = account.user
+    refresh['subscription'] = account.subscription
+
+    access = AccessToken()
+    access.set_exp(lifetime=timedelta(hours=1))
+    access['id_account'] = account.id_account
+    access['user'] = account.user
+    access['subscription'] = account.subscription
+
+    return Response({
+        "code": 1,
+        "message": "Google login successful",
+        "refresh": str(refresh),
+        "access": str(access),
+        "id_account": account.id_account,
+        "user": account.user,
+        "subscription": account.subscription
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([])
+def facebook_register(request):
+    token = request.data.get('token')
+
+    if not token:
+        return Response(
+            {"detail": "Facebook token required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    r = requests.get(
+        'https://graph.facebook.com/me',
+        params={
+            'fields': 'id,email,name',
+            'access_token': token
+        }
+    )
+
+    if r.status_code != 200:
+        return Response(
+            {"detail": "Invalid Facebook token"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    data = r.json()
+
+    email = data.get('email')
+    facebook_id = data.get('id')
+
+    if not email:
+        return Response(
+            {"detail": "Facebook account has no email"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    account = Account.objects.filter(email=email).first()
+
+    if not account:
+        account = Account.objects.create(
+            user=email,
+            email=email,
+            facebook_id=facebook_id,
+            password=None,
+            status=1,
+            subscription='free'
+        )
+    else:
+        if not account.facebook_id:
+            account.facebook_id = facebook_id
+            account.save()
+
+    refresh = RefreshToken()
+    refresh.set_exp(lifetime=timedelta(days=7))
+    refresh['id_account'] = account.id_account
+    refresh['user'] = account.user
+    refresh['subscription'] = account.subscription
+
+    access = AccessToken()
+    access.set_exp(lifetime=timedelta(hours=1))
+    access['id_account'] = account.id_account
+    access['user'] = account.user
+    access['subscription'] = account.subscription
+
+    return Response({
+        "code": 1,
+        "message": "Facebook login successful",
+        "refresh": str(refresh),
+        "access": str(access),
+        "id_account": account.id_account,
+        "user": account.user,
+        "subscription": account.subscription
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -148,3 +299,132 @@ def token_login(request):
         "user": account.user,
         "subscription": account.subscription
     }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([])
+def google_login(request):
+    token = request.data.get('token')
+
+    if not token:
+        return Response({"code": 0, "message": "Token requerido"}, status=400)
+
+    # Validar token con Google
+    r = requests.get(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    if r.status_code != 200:
+        return Response({"code": 0, "message": "Token Google inválido"}, status=401)
+
+    data = r.json()
+
+    email = data.get('email')
+    google_id = data.get('sub')
+
+    if not email:
+        return Response({"code": 0, "message": "Google no devolvió email"}, status=400)
+
+    account = Account.objects.filter(email=email).first()
+
+    if account:
+        if not account.google_id:
+            account.google_id = google_id
+            account.save()
+    else:
+        account = Account.objects.create(
+            user=email,
+            email=email,
+            google_id=google_id,
+            password=None,
+            status=1,
+            subscription='free'
+        )
+
+    # === TU MISMO TOKEN ===
+    refresh = RefreshToken()
+    refresh.set_exp(lifetime=timedelta(days=7))
+    refresh['id_account'] = account.id_account
+    refresh['user'] = account.user
+    refresh['subscription'] = account.subscription
+
+    access = AccessToken()
+    access.set_exp(lifetime=timedelta(hours=1))
+    access['id_account'] = account.id_account
+    access['user'] = account.user
+    access['subscription'] = account.subscription
+
+    return Response({
+        "code": 1,
+        "message": "Login Google OK",
+        "refresh": str(refresh),
+        "access": str(access),
+        "id_account": account.id_account,
+        "user": account.user,
+        "subscription": account.subscription
+    })
+
+@api_view(['POST'])
+@permission_classes([])
+def facebook_login(request):
+    token = request.data.get('token')
+
+    if not token:
+        return Response({"code": 0, "message": "Token requerido"}, status=400)
+
+    r = requests.get(
+        'https://graph.facebook.com/me',
+        params={
+            'fields': 'id,email,name',
+            'access_token': token
+        }
+    )
+
+    if r.status_code != 200:
+        return Response({"code": 0, "message": "Token Facebook inválido"}, status=401)
+
+    data = r.json()
+
+    email = data.get('email')
+    facebook_id = data.get('id')
+
+    if not email:
+        return Response({"code": 0, "message": "Facebook no devolvió email"}, status=400)
+
+    account = Account.objects.filter(email=email).first()
+
+    if account:
+        if not account.facebook_id:
+            account.facebook_id = facebook_id
+            account.save()
+    else:
+        account = Account.objects.create(
+            user=email,
+            email=email,
+            facebook_id=facebook_id,
+            password=None,
+            status=1,
+            subscription='free'
+        )
+
+    refresh = RefreshToken()
+    refresh.set_exp(lifetime=timedelta(days=7))
+    refresh['id_account'] = account.id_account
+    refresh['user'] = account.user
+    refresh['subscription'] = account.subscription
+
+    access = AccessToken()
+    access.set_exp(lifetime=timedelta(hours=1))
+    access['id_account'] = account.id_account
+    access['user'] = account.user
+    access['subscription'] = account.subscription
+
+    return Response({
+        "code": 1,
+        "message": "Login Facebook OK",
+        "refresh": str(refresh),
+        "access": str(access),
+        "id_account": account.id_account,
+        "user": account.user,
+        "subscription": account.subscription
+    })

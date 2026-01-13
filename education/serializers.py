@@ -11,3 +11,10 @@ class EducationSerializer(serializers.ModelSerializer):
                   'institute', 
                   'education_field'
                  ]
+
+class EducationPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Education
+        fields = ['education',
+                  'education_field'
+                 ]

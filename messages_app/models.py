@@ -18,6 +18,13 @@ class Message(models.Model):
         db_column="receiver_account_id"
     )
 
+    title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_column="title"
+    )
+
     message = models.TextField()
     status = models.IntegerField(default=0)
 

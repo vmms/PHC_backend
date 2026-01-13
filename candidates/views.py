@@ -17,8 +17,9 @@ from companies.serializers import CompanySerializer
 
 from django.utils.deconstruct import deconstructible
 from django.conf import settings
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 import os
 import time
@@ -253,7 +254,7 @@ def apply_to_job(request):
         candidate = Candidate.objects.get(account=account)
     except Candidate.DoesNotExist:
         return Response(
-            {"message": "No existe un candidato asociado a esta cuenta"},
+            {'message': 'No candidate associated with this user'},
             status=status.HTTP_404_NOT_FOUND
         )
 
@@ -261,7 +262,7 @@ def apply_to_job(request):
     job_id = request.data.get('job_id')
     if not job_id:
         return Response(
-            {"message": "Falta el job_id"},
+            {"message": "job_id is required"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -270,14 +271,14 @@ def apply_to_job(request):
         job = Job.objects.get(id_jobs=job_id)
     except Job.DoesNotExist:
         return Response(
-            {"message": "El empleo no existe"},
+            {"message": "Job does not exist"},
             status=status.HTTP_404_NOT_FOUND
         )
 
     # validar si ya aplicó
     if JobApplication.objects.filter(id_candidate=candidate, id_jobs=job).exists():
         return Response(
-            {"message": "Ya aplicaste a este empleo"},
+            {"message": "You have already applied for this job"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -289,7 +290,7 @@ def apply_to_job(request):
     )
 
     return Response(
-        {"message": "Aplicación enviada con éxito"},
+        {"message": "Application submitted successfully"},
         status=status.HTTP_201_CREATED
     )
 
@@ -353,7 +354,7 @@ def list_job(request):
     try:
         radius_miles = float(radius_miles)
     except (ValueError, TypeError):
-        return Response({"message": "radius_miles debe ser un número"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "radius miles must be a number"}, status=status.HTTP_400_BAD_REQUEST)
 
     jobs = Job.objects.filter(is_active=1)
 
@@ -375,7 +376,7 @@ def list_job(request):
             salary_max = float(salary_max)
             jobs = jobs.extra(where=["CAST(salary AS DECIMAL) <= %s"], params=[salary_max])
         except ValueError:
-            return Response({"message": "salary debe ser un número"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "salary must be a number"}, status=status.HTTP_400_BAD_REQUEST)
 
     # ---------------------
     # Filtrar por distancia usando lat/lng
@@ -390,10 +391,10 @@ def list_job(request):
             city_loc = geolocator.geocode(location, timeout=10)
             time.sleep(2)
             if not city_loc:
-                return Response({"message": "Ciudad no encontrada"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "City not found"}, status=status.HTTP_400_BAD_REQUEST)
             city_lat, city_lng = city_loc.latitude, city_loc.longitude
         except Exception as e:
-            return Response({"message": f"Error obteniendo coordenadas de la ciudad: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": f"Error obtaining city coordinates: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # recorrer jobs y calcular distancia
         for job in jobs:
@@ -507,51 +508,57 @@ def get_company(request):
     company_id = request.data.get('company_id')
     
     if not company_id:
-        return Response({"message": "company_id es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "company_id is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         company = Company.objects.get(id_company=company_id)
     except Company.DoesNotExist:
-        return Response({"message": "Company no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"message": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
     
     serializer = CompanySerializer(company)
     return Response({"company": serializer.data}, status=status.HTTP_200_OK)
 
+def format_date(date):
+    if not date:
+        return None
+    return date.strftime("%m-%d-%Y")
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def my_applications(request):
     id_candidate = request.data.get("id_candidate")
+    title = request.data.get("title")       # directamente title
+    company = request.data.get("company")   # directamente company
 
     if not id_candidate:
-        return Response({"message": "id_candidate es requerido"}, status=400)
+        return Response({"message": "id_candidate is required"}, status=400)
 
-    # Obtener todas las aplicaciones del candidato
-    applications = JobApplication.objects.filter(
-        id_candidate=id_candidate
-    ).order_by("-created_at")  # último al primero
+    # Traemos las aplicaciones con jobs y compañías en un solo query
+    applications = JobApplication.objects.filter(id_candidate=id_candidate).select_related('id_jobs__company')
+
+    # Aplicar filtros si vienen en el request
+    if title:
+        applications = applications.filter(id_jobs__title__icontains=title)
+    if company:
+        applications = applications.filter(id_jobs__company__name__icontains=company)
+
+    applications = applications.order_by("-created_at")
 
     result = []
 
     for app in applications:
         job = app.id_jobs
+        company_obj = job.company
 
-        # Serializar el job
+        # Serializar job y compañía
         job_data = JobSerializer(job).data
+        job_data["company"] = CompanySerializer(company_obj, context={"request": request}).data
 
-        # Agregar la compañía al job (como ya lo haces)
-        company = job.company
-        job_data["company"] = CompanySerializer(
-            company,
-            context={"request": request}
-        ).data
-
-        # Construir el objeto final de la aplicación
         result.append({
             "id_job_application": app.id_job_application,
             "status": app.status,
-            "created_at": app.created_at.date() if app.created_at else None,
-            "updated_at": app.updated_at.date() if app.updated_at else None,
+            "created_at": format_date(app.created_at),
+            "updated_at": format_date(app.updated_at),
             "job": job_data
         })
 
@@ -619,26 +626,31 @@ def download_cvu(request):
     id_candidate = request.data.get('id_candidate')
 
     if not id_candidate:
-        return Response(
-            {'error': 'id_candidate is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': 'id_candidate is required'}, status=400)
 
-    candidate = get_object_or_404(Candidate,id_candidate=id_candidate)
+    candidate = get_object_or_404(Candidate, id_candidate=id_candidate)
 
     if not candidate.cvu:
-        return Response({'error': 'CVU not found'},status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'CVU not found'}, status=404)
 
     file_path = candidate.cvu.path
 
     if not os.path.exists(file_path):
-        return Response({'error': 'File does not exist'},status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'File does not exist'}, status=404)
 
-    # Nombre amigable (sale DIRECTO de la tabla candidate)
     download_name = f'{candidate.first_name}_{candidate.last_name}_CV.pdf'
+    #print(download_name)
+    
+    with open(file_path, 'rb') as f:
+        response = HttpResponse(
+            f.read(),
+            content_type='application/pdf'
+        )
 
-    response = FileResponse(open(file_path, 'rb'),content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="{download_name}"'
+    )
 
-    response['Content-Disposition'] = (f'attachment; filename="{download_name}"')
+    response['Content-Length'] = os.path.getsize(file_path)
 
     return response

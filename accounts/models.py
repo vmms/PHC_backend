@@ -6,6 +6,10 @@ class Account(models.Model):
     user = models.CharField(max_length=45)
     password = models.CharField(max_length=100)
     subscription = models.CharField(max_length=45)
+    
+    email = models.EmailField(max_length=100, null=True, blank=True)
+    google_id = models.CharField(max_length=255, null=True, blank=True)
+    facebook_id = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         managed = False

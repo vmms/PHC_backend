@@ -9,6 +9,7 @@ from .models import Company
 from .serializers import CompanySerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
+from django.db.models import Q, Exists, OuterRef
 
 from jobs.models import Job, SkillsHasJobs, ScheduleHasJobs
 from jobs.serializers import JobSerializer
@@ -19,7 +20,8 @@ from candidates.serializers import CandidatePublicSerializer, CandidateContactSe
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
-
+from datetime import datetime, time
+import json
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -30,7 +32,7 @@ def list_companies(request):
         if not companies.exists():
             return Response({"message": "No companies found", "results": []}, status=status.HTTP_200_OK)
 
-        return Response({"message": "Imagen subida con éxito"}, status=status.HTTP_200_OK)
+        return Response(companies, status=status.HTTP_200_OK)
 
     except DatabaseError:
         return Response({"error": "Database error while fetching companies"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -119,21 +121,45 @@ def delete_company(request, pk):
     company.delete()
     return Response({'message': 'Company deleted successfully'}, status=status.HTTP_200_OK)
 
+def format_date(date):
+    if not date:
+        return None
+    return date.strftime("%m-%d-%Y")
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_my_job_applications(request):
     try:
-        # Obtener la company del usuario logueado
         company = Company.objects.get(account=request.user)
+        
+        # 🔹 Filtros recibidos (pueden venir o no)
+        title = request.data.get("title")
+        first_name = request.data.get("first_name")
+        last_name = request.data.get("last_name")
 
-        # Obtener los jobs de la company
+        # 🔹 Jobs de la company
         jobs = Job.objects.filter(company=company)
 
-        # Construir la respuesta anidada
+        # 🔹 Filtro por título del job
+        if title:
+            jobs = jobs.filter(title__icontains=title)
+
         jobs_data = []
+
         for job in jobs:
             applications = JobApplication.objects.filter(id_jobs=job)
-            # Construir manualmente la info del candidato
+
+            # 🔹 Filtros por candidato
+            if first_name:
+                applications = applications.filter(
+                    id_candidate__first_name__icontains=first_name
+                )
+
+            if last_name:
+                applications = applications.filter(
+                    id_candidate__last_name__icontains=last_name
+                )
+
             applications_data = []
             for app in applications:
                 applications_data.append({
@@ -142,15 +168,17 @@ def list_my_job_applications(request):
                     "id_candidate": app.id_candidate.id_candidate,
                     "candidate_name": f"{app.id_candidate.first_name} {app.id_candidate.last_name}",
                     "status": app.status,
-                    "created_at": app.created_at.date() if app.created_at else None,
-                    "updated_at": app.updated_at.date() if app.updated_at else None,
+                    "created_at": format_date(app.created_at),
+                    "updated_at": format_date(app.updated_at),
                 })
 
-            jobs_data.append({
-                "id_jobs": job.id_jobs,
-                "title": job.title,
-                "applications": applications_data
-            })
+            # 🔹 Opcional: no regresar jobs sin aplicaciones
+            if applications_data:
+                jobs_data.append({
+                    "id_jobs": job.id_jobs,
+                    "title": job.title,
+                    "applications": applications_data
+                })
 
         return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
 
@@ -423,3 +451,361 @@ def get_candidate_contact_info(request):
     )
 
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+def parse_date(d):
+    if not d:
+        return None
+    return datetime.strptime(d, "%Y-%m-%d").date()
+
+def parse_time(t):
+    if not t:
+        return None
+    return datetime.strptime(t, "%H:%M").time()
+
+def hours_intersect(start1, end1, start2, end2):
+    """Verifica si dos rangos de horas se intersectan"""
+    return max(start1, start2) < min(end1, end2)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def search_candidates(request):
+    print(request.data)
+    data = request.data or {}
+
+    # -----------------------------------
+    # 1. Validar company desde account
+    # -----------------------------------
+    try:
+        company = Company.objects.get(account_id=request.user.id_account)
+    except Company.DoesNotExist:
+        return Response(
+            {"message": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # -----------------------------------
+    # 2. Base queryset
+    # -----------------------------------
+    candidates = Candidate.objects.filter(status='active').select_related('address')
+
+    # -----------------------------------
+    # 3. Filtros simples
+    # -----------------------------------
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    desired_position = data.get('desired_position')
+    job_type = data.get('job_type')
+    employment_type = data.get('employment_type')
+    modality = data.get('modality')
+    salary_max = data.get('salary')
+
+    last_position = data.get('last_position')
+    adult = data.get('adult')
+    work_permission = data.get('work_permission')
+    years_experience = data.get('years_experience')
+    servsafe = data.get('servsafe')
+
+
+    location = data.get('location')        # ciudad de referencia
+    radius_miles = data.get('radius_miles', 350)
+
+    if first_name and isinstance(first_name, str) and first_name.lower() != 'none':
+        candidates = candidates.filter(first_name__icontains=first_name)
+
+    if last_name and isinstance(last_name, str) and last_name.lower() != 'none':
+        candidates = candidates.filter(last_name__icontains=last_name)
+
+    if desired_position and isinstance(desired_position, str) and desired_position.lower() != 'none':
+        candidates = candidates.filter(desired_position__icontains=desired_position)
+
+    if job_type and isinstance(job_type, str) and job_type.lower() != 'none':
+        candidates = candidates.filter(job_type__iexact=job_type)
+
+    if employment_type and isinstance(employment_type, str) and employment_type.lower() != 'none':
+        candidates = candidates.filter(employment_type__iexact=employment_type)
+
+    if modality and isinstance(modality, str) and modality.lower() != 'none':
+        candidates = candidates.filter(modality__iexact=modality)
+
+    if salary_max is not None:
+        try:
+            salary_max = float(salary_max)
+            candidates = candidates.extra(
+                where=["CAST(salary AS DECIMAL) <= %s"],
+                params=[salary_max]
+            )
+        except ValueError:
+            return Response(
+                {"message": "salary must be a number"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    if last_position and isinstance(last_position, str) and last_position.lower() != 'none':
+        candidates = candidates.filter(last_position__iexact=last_position)
+
+    if adult and isinstance(adult, str) and adult.lower() != 'none':
+        if adult.lower() == 'yes':
+            adult_value = 1
+        elif adult.lower() == 'no':
+            adult_value = 0
+        else:
+            adult_value = None  # por si mandan algo raro
+
+        if adult_value is not None:
+            candidates = candidates.filter(adult=adult_value)
+
+    if work_permission and isinstance(work_permission, str) and work_permission.lower() != 'none':
+        if work_permission.lower() == 'yes':
+            wp_value = 1
+        elif work_permission.lower() == 'no':
+            wp_value = 0
+        else:
+            wp_value = None
+
+        if wp_value is not None:
+            candidates = candidates.filter(work_permission=wp_value)
+    
+    if years_experience not in (None, "", "none"):
+        try:
+            years_experience = int(years_experience)
+            candidates = candidates.filter(years_experience__gte=years_experience)
+        except (TypeError, ValueError):
+            return Response(
+                {"message": "years_experience must be a number"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    if servsafe and isinstance(servsafe, str) and servsafe.lower() != 'none':
+        candidates = candidates.filter(servsafe__iexact=servsafe)
+    
+
+    # -----------------------------------
+    # 4. Filtro por distancia (CON CACHE)
+    # -----------------------------------
+    if location and isinstance(location, str) and location.lower() != 'none':
+        try:
+            geolocator = Nominatim(user_agent="PHC_backend_search_candidates")
+            ref_loc = geolocator.geocode(location, timeout=10)
+
+            if not ref_loc:
+                return Response(
+                    {"message": "Reference city not found"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            ref_lat, ref_lng = ref_loc.latitude, ref_loc.longitude
+            radius_miles = float(radius_miles)
+
+        except Exception as e:
+            return Response(
+                {"message": f"Error obtaining coordinates: {e}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        geo_cache = {}       
+        request_count = 0
+        filtered_candidates = []
+
+        for candidate in candidates:
+            addr = candidate.address
+            if not addr or not addr.city:
+                continue
+
+            addr_key = f"{addr.city}|{addr.state}|{addr.country}"
+
+            # -------------------------
+            # Cache hit
+            # -------------------------
+            if addr_key in geo_cache:
+                cand_lat, cand_lng = geo_cache[addr_key]
+
+            # -------------------------
+            # Cache miss
+            # -------------------------
+            else:
+                try:
+                    if request_count > 0:
+                        time.sleep(1.2)  # delay controlado
+
+                    query = f"{addr.city}, {addr.state or ''}, {addr.country or ''}"
+                    loc = geolocator.geocode(query, timeout=10)
+                    request_count += 1
+
+                    if not loc:
+                        continue
+
+                    cand_lat, cand_lng = loc.latitude, loc.longitude
+                    geo_cache[addr_key] = (cand_lat, cand_lng)
+
+                except Exception:
+                    continue
+
+            dist = haversine(ref_lat, ref_lng, cand_lat, cand_lng)
+
+            if dist <= radius_miles:
+                filtered_candidates.append(candidate)
+
+        candidates = filtered_candidates
+
+    # -----------------------------------
+    # 5. Serializar + Schedule
+    # -----------------------------------
+    serializer = CandidatePublicSerializer(
+        candidates,
+        many=True,
+        context={'request': request}
+    )
+
+    candidates_data = serializer.data
+
+    # -----------------------------------
+    # 6. Filtrado por schedule DESPUÉS de serializar
+    # -----------------------------------
+
+    for cand_data in candidates_data:
+        cand_id = cand_data.get("id_candidate")
+
+        try:
+            cand_obj = Candidate.objects.get(id_candidate=cand_id)
+        except Candidate.DoesNotExist:
+            cand_data["schedule"] = []
+            continue
+
+        temp_schedule = defaultdict(list)
+
+        for link in CandidateHasSchedule.objects.filter(candidate=cand_obj).select_related('schedule'):
+            sched = link.schedule
+            if sched.type == "permanent":
+                temp_schedule["permanent"].append({
+                    "day": getattr(sched, "day", None),
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None,
+                    "hired_date": sched.date_start.strftime("%Y-%m-%d") if sched.date_start else None
+                })
+            elif sched.type == "range":
+                temp_schedule["range"].append({
+                    "date_start": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                    "date_end": getattr(sched, "date_end", None).strftime("%Y-%m-%d") if getattr(sched, "date_end", None) else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+            elif sched.type == "multiple":
+                temp_schedule["multiple"].append({
+                    "date": getattr(sched, "date_start", None).strftime("%Y-%m-%d") if getattr(sched, "date_start", None) else None,
+                    "time_start": sched.time_start.strftime("%H:%M") if sched.time_start else None,
+                    "time_end": sched.time_finish.strftime("%H:%M") if sched.time_finish else None
+                })
+
+        # Al final, agregamos hired_date en schedule_data
+        schedule_data = []
+        for sched_type, items in temp_schedule.items():
+            hired_date = items[0].get("hired_date") if items else None
+            schedule_data.append({
+                "type": sched_type,
+                "hired_date": hired_date,
+                "dates" if sched_type == "multiple" else "days": items
+            })
+
+        cand_data["schedule"] = schedule_data
+    
+    # print(candidates_data)
+    schedule_str = data.get('schedule')
+    schedule_data = {}
+    ranges = []
+    multiples = []
+
+    filtered_candidates = []
+
+    if schedule_str:  # viene algo del frontend
+        print("filtra por hora")
+        try:
+            print("parsear el JSON del string")
+            schedule_data = json.loads(schedule_str)
+            ranges = schedule_data.get("range", [])
+            print("ranges",ranges)
+            multiples = schedule_data.get("multiple", [])
+            print("multiples",multiples)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            ranges = []
+            multiples = []
+
+        for cand in candidates_data:
+            # print(cand["first_name"])
+            match = False
+
+            # --- FILTRO POR RANGE ---
+            if ranges:
+                r = ranges[0]  # siempre solo hay uno
+                r_date_start = parse_date(r.get("date_start"))
+                r_date_end = parse_date(r.get("date_end"))
+                r_hour_start = parse_time(r.get("hour_start"))
+                r_hour_end = parse_time(r.get("hour_end"))
+
+                for sched in cand.get("schedule", []):
+                    # print(sched.get("hired_date"))
+                    hired_date = parse_date(sched.get("hired_date"))
+                    if not hired_date:
+                        continue
+
+                    # Paso 1: hired_date dentro del rango
+                    hired_date = parse_date(sched.get("hired_date"))
+                    if not (
+                        hired_date < r_date_start or
+                        (r_date_start <= hired_date <= r_date_end)
+                    ):
+                        continue
+
+                    # Paso 2: verificar horas de cada day dentro del schedule
+                    days = sched.get("days", sched.get("dates", []))
+                    for d in days:
+                        day_start = parse_time(d.get("time_start"))
+                        day_end = parse_time(d.get("time_end"))
+                        if hours_intersect(r_hour_start, r_hour_end, day_start, day_end):
+                            match = True
+                            break
+                    if match:
+                        break
+
+            # --- FILTRO POR MULTIPLE ---
+            elif multiples:
+                candidate_schedule = cand.get("schedule", [])
+                if not candidate_schedule:
+                    continue  # candidato no tiene schedule
+
+                sched = candidate_schedule[0]  # tomamos el único schedule
+                candidate_days = sched.get("days", sched.get("dates", []))
+
+                all_match = True  # asumimos que todas las fechas del JSON coinciden
+                for m_item in multiples:
+                    m_date = parse_date(m_item.get("date_start"))
+                    m_hour_start = parse_time(m_item.get("hour_start"))
+                    m_hour_end = parse_time(m_item.get("hour_end"))
+
+                    # Buscar un day del candidato que coincida con la fecha del JSON
+                    day_found = False
+                    for d in candidate_days:
+                        day_hired_date = parse_date(d.get("hired_date"))
+                        if day_hired_date != m_date:
+                            continue
+
+                        day_start = parse_time(d.get("time_start"))
+                        day_end = parse_time(d.get("time_end"))
+                        if hours_intersect(m_hour_start, m_hour_end, day_start, day_end):
+                            day_found = True
+                            break
+
+                    if not day_found:
+                        all_match = False
+                        break  # esta fecha del JSON no coincide con ningún day del candidato
+
+                if all_match:
+                    match = True
+
+            if match:
+                filtered_candidates.append(cand)
+
+    else:
+        print("no filtrar por hora")
+        filtered_candidates = candidates_data
+
+    print(filtered_candidates)
+    return Response({"candidates": filtered_candidates}, status=200)

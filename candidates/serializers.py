@@ -4,7 +4,7 @@ from addresses.models import Address
 from education.models import Education
 from addresses.serializers import AddressSerializer
 from addresses.serializers import AddressPublicSerializer
-from education.serializers import EducationSerializer
+from education.serializers import EducationSerializer, EducationPublicSerializer
 
 
 class CandidateSerializer(serializers.ModelSerializer):
@@ -103,6 +103,9 @@ class CandidateSerializer(serializers.ModelSerializer):
         return None
 
 class CandidatePublicSerializer(serializers.ModelSerializer):
+    address = AddressPublicSerializer(read_only=True)
+    education = EducationPublicSerializer(read_only=True)
+
     class Meta:
         model = Candidate
         fields = [
@@ -119,6 +122,8 @@ class CandidatePublicSerializer(serializers.ModelSerializer):
             'salary',
             'photo',
             'about',
+            'address',
+            'education'
         ]
 
 class CandidateContactSerializer(serializers.ModelSerializer):

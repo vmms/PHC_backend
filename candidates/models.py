@@ -42,6 +42,8 @@ class Candidate(models.Model):
     first_name = models.CharField(max_length=45)
     last_name = models.CharField(max_length=45)
     phone_number = models.CharField(max_length=20)
+    emergency_contact_name = models.CharField(max_length=100)
+    emergency_contact_phone = models.CharField(max_length=20)
     address = models.ForeignKey(Address, on_delete=models.CASCADE)
     education = models.ForeignKey(Education, on_delete=models.CASCADE)
     status = models.CharField(max_length=10, choices=[('active','active'),('inactive','inactive')], default='active')
@@ -61,6 +63,8 @@ class Candidate(models.Model):
     employment_type = models.CharField(max_length=45, null=True, blank=True)
     modality = models.CharField(max_length=45, null=True, blank=True)
     salary = models.CharField(max_length=75)
+    servsafe = models.CharField(max_length=25, default='na')
+
 
     class Meta:
         db_table = "candidate"

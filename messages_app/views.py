@@ -9,34 +9,35 @@ from candidates.models import Candidate
 from companies.models import Company
 from accounts.models import Account
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_message(request):
-    user_account = request.user  # Account logueado
-    account_type = user_account.subscription  # candidate, company, premium
-    print("user_account:",user_account.id_account)
+    print(request.data)
+    user_account = request.user
+    account_type = user_account.subscription
+    print(account_type)
 
     receiver_candidate_id = request.data.get("receiver_candidate_id")
     receiver_company_id = request.data.get("receiver_company_id")
     text = request.data.get("message")
+    title = request.data.get("title")  
 
     if not text:
         return Response({"error": "message is required"}, status=400)
 
     # -------------------------------------------------------
-    # Determinar receiver_account_id según tipo de cuenta
+    # Determinar receiver_account_id
     # -------------------------------------------------------
-    if account_type == "candidate":  # candidato enviando a empresa
+    if account_type == "candidate":
         if not receiver_company_id:
             return Response({"error": "Must send receiver_company_id"}, status=400)
         try:
-            company = Company.objects.get(account_id=receiver_company_id)
+            company = Company.objects.get(id_company=receiver_company_id)
             receiver_account_id = company.account_id
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=404)
 
-    elif account_type in ["company", "premium"]:  # empresa enviando a candidato
+    elif account_type in ["company", "premium"]:
         if not receiver_candidate_id:
             return Response({"error": "Must send receiver_candidate_id"}, status=400)
         try:
@@ -48,29 +49,35 @@ def create_message(request):
         return Response({"error": "Unknown account type"}, status=400)
 
     # -------------------------------------------------------
-    # Encontrar conversation_id existente (1 a 1)
+    # Buscar conversación existente (1 a 1)
     # -------------------------------------------------------
     conversation = Message.objects.filter(
         Q(sender_account=user_account, receiver_account_id=receiver_account_id) |
         Q(sender_account_id=receiver_account_id, receiver_account=user_account)
-    ).order_by('-created_at').first()
+    ).order_by('created_at').first()
 
     if conversation:
         conversation_id = conversation.conversation_id
+        conversation_title = title   # solo para ESTE mensaje
+
     else:
-        # No hay conversación previa → asignar el siguiente conversation_id secuencial
-        max_conv = Message.objects.aggregate(Max('conversation_id'))['conversation_id__max'] or 0
+        max_conv = Message.objects.aggregate(
+            Max('conversation_id')
+        )['conversation_id__max'] or 0
+
         conversation_id = max_conv + 1
+        conversation_title = title
 
     # -------------------------------------------------------
-    # Crear el mensaje
+    # Crear mensaje
     # -------------------------------------------------------
     message = Message.objects.create(
         sender_account=user_account,
         receiver_account_id=receiver_account_id,
         message=text,
         status=0,
-        conversation_id=conversation_id
+        conversation_id=conversation_id,
+        title=conversation_title
     )
 
     return Response(MessageSerializer(message).data, status=201)
@@ -82,17 +89,53 @@ def create_message(request):
 @permission_classes([IsAuthenticated])
 def list_chats(request):
     user_account = request.user
+    data = request.data or {}
 
-    chat_partners_ids = (
-        Message.objects.filter(sender_account_id=user_account.id_account)
-        .values_list('receiver_account_id', flat=True)
-        .union(
-            Message.objects.filter(receiver_account_id=user_account.id_account)
-            .values_list('sender_account_id', flat=True)
-        )
+    title = data.get("title")
+    company_name = data.get("company")
+
+    # -----------------------------------
+    # 1. Mensajes donde participo
+    # -----------------------------------
+    messages_qs = Message.objects.filter(
+        Q(sender_account_id=user_account.id_account) |
+        Q(receiver_account_id=user_account.id_account)
     )
 
+    # -----------------------------------
+    # 2. Filtro por title
+    # -----------------------------------
+    if title:
+        messages_qs = messages_qs.filter(title__icontains=title)
+
+    # -----------------------------------
+    # 3. Filtro por company (sin duplicar columnas)
+    # -----------------------------------
+    if company_name:
+        company_account_ids = Company.objects.filter(
+            name__icontains=company_name
+        ).values_list("account_id", flat=True)
+
+        messages_qs = messages_qs.filter(
+            Q(sender_account_id__in=company_account_ids) |
+            Q(receiver_account_id__in=company_account_ids)
+        )
+
+    # -----------------------------------
+    # 4. Partners únicos
+    # -----------------------------------
+    chat_partners_ids = (
+        messages_qs.values_list('sender_account_id', flat=True)
+        .union(messages_qs.values_list('receiver_account_id', flat=True))
+    )
+
+    chat_partners_ids = [
+        acc_id for acc_id in chat_partners_ids
+        if acc_id != user_account.id_account
+    ]
+
     result = []
+
     for acc_id in chat_partners_ids:
         unread_count = Message.objects.filter(
             sender_account_id=acc_id,
@@ -105,7 +148,7 @@ def list_chats(request):
         if user_account.subscription == 'candidate':
             company = Company.objects.get(account_id=acc_id)
             result.append({
-                "company_id": company.id_company,  # 👈 mejor que account_id
+                "company_id": company.id_company,
                 "company_name": company.name,
                 "has_unread": has_unread
             })
@@ -119,7 +162,10 @@ def list_chats(request):
 
     return Response(result, status=200)
 
-
+def format_date(date):
+    if not date:
+        return None
+    return date.strftime("%m-%d-%Y")
 
 # ---------------------------------------------------------
 # 3. CHAT DETALLADO (LOS MENSAJES ENTRE YO Y LA OTRA PERSONA)
@@ -129,17 +175,18 @@ def list_chats(request):
 def chat_detail(request):
     user_account = request.user
 
-    candidate_id = request.data.get("candidate_id")
-    company_id = request.data.get("company_id")
+    id_candidate = request.data.get("candidate_id")
+    id_company = request.data.get("company_id")
+    print("company_id", id_company)
 
-    if candidate_id:
+    if id_candidate:
         try:
-            acc_id = Candidate.objects.get(account_id=candidate_id).account_id
+            acc_id = Candidate.objects.get(id_candidate=id_candidate).account_id
         except Candidate.DoesNotExist:
             return Response({"error": "Candidate not found"}, status=404)
-    elif company_id:
+    elif id_company:
         try:
-            acc_id = Company.objects.get(account_id=company_id).account_id
+            acc_id = Company.objects.get(id_company=id_company).account_id
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=404)
     else:
@@ -162,7 +209,8 @@ def chat_detail(request):
         "from": "me" if m.sender_account_id == user_account.id_account else "other",
         "message": m.message,
         "status": m.status,
-        "created_at": m.created_at
+        "created_at": format_date(m.created_at),
+        "title": m.title
     } for m in messages]
 
     return Response(data, status=200)

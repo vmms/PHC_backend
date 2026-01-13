@@ -19,7 +19,7 @@ class Job(models.Model):
 
     job_type = models.CharField(max_length=60, null=True, blank=True)
     title = models.CharField(max_length=100)
-    location = models.CharField(max_length=100)
+    location = models.CharField(max_length=100, null=True, blank=True)
     salary = models.CharField(max_length=75)
     experience = models.CharField(max_length=250)
 
