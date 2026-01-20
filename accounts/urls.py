@@ -16,4 +16,7 @@ urlpatterns = [
     path('token/', views.token_login, name='token_login'),
     path('google_login/', views.google_login, name='google_login'),
     path('facebook_login/', views.facebook_login, name='facebook_login'),
+    path('recover_password/', views.recover_password, name='recover_password'),
+    path('update_password/', views.update_password, name='update_password'),
+    path('delete/', views.delete_account, name='delete_account'),
 ]

@@ -9,6 +9,16 @@ from rest_framework.decorators import permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from datetime import timedelta
 
+from companies.models import Company
+from candidates.models import Candidate
+from addresses.models import Address
+from candidates.services import create_candidate_internal
+
+import secrets
+import string
+from django.db.models import Q
+from django.core.mail import send_mail
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -17,6 +27,9 @@ def list_accounts(request):
     accounts = Account.objects.all()
     serializer = AccountSerializer(accounts, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+from django.core.mail import send_mail
+from django.conf import settings
 
 @api_view(['POST'])
 @permission_classes([])
@@ -37,8 +50,40 @@ def create_account(request):
 
     serializer = AccountSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        account = serializer.save(email=username)  # 👈 GUARDA el objeto
+        print("account: ",account.id_account)
+        
+        if account.subscription == "candidate":
+            create_candidate_internal(
+                id_account=account.id_account,
+                email=account.email
+            )
+
+        elif account.subscription == "company":
+            from companies.services import create_company_internal
+
+            create_company_internal(
+                id_account=account.id_account,
+                email=account.email
+            )
+
+        send_mail(
+            subject="Welcome to Professional Hospitality Connections",
+            message=(
+                "Welcome to Professional Hospitality Connections!\n\n"
+                "Your account has been successfully created.\n\n"
+                "You can now log in and start exploring the platform.\n\n"
+                "Best regards,\n"
+                "Professional Hospitality Connections"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[account.email],
+            fail_silently=False  
+        )
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([])
@@ -257,48 +302,96 @@ def deactivate_account(request):
 @api_view(['POST'])
 @permission_classes([])
 def token_login(request):
+    print(request.data)
     username = request.data.get('user')
     password = request.data.get('password')
+    type_account = request.data.get('type')  # 'company' | 'candidate'
 
-    if not username or not password:
-        return Response({"code": 0, "message": "Se requiere usuario y contraseña"}, status=400)
+    if not username or not password or not type_account:
+        return Response(
+            {
+                "code": 0,
+                "message": "Username, password, and account type are required."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     try:
         account = Account.objects.get(user=username)
     except Account.DoesNotExist:
-        return Response({"code": 0, "message": "Usuario no encontrado"}, status=404)
+        return Response(
+            {
+                "code": 0,
+                "message": "User not found."
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     if account.password != password:
-        return Response({"code": 0, "message": "Contraseña incorrecta"}, status=401)
+        return Response(
+            {
+                "code": 0,
+                "message": "Invalid password."
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
-    # --- CREAR TOKENS MANUALMENTE ---
-    # Refresh token con expiración (por ejemplo 7 días)
+    # -------------------------------
+    # VALIDATE ACCOUNT TYPE
+    # -------------------------------
+    is_company = Company.objects.filter(account=account).exists()
+    is_candidate = Candidate.objects.filter(account=account).exists()
+    print(is_company)
+    print(is_candidate)
+
+    if type_account == 'company' and not is_company:
+        return Response(
+            {
+                "code": 0,
+                "message": "This account is not a company account. Please log in as a candidate."
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if type_account == 'candidate' and not is_candidate:
+        return Response(
+            {
+                "code": 0,
+                "message": "This account is not a candidate account. Please log in as a company."
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # -------------------------------
+    # CREATE TOKENS
+    # -------------------------------
     refresh = RefreshToken()
     refresh.set_exp(lifetime=timedelta(days=7))
     refresh['id_account'] = account.id_account
     refresh['user'] = account.user
     refresh['subscription'] = account.subscription
+    refresh['type_account'] = type_account
 
-    # Access token con expiración (por ejemplo 1 hora)
     access = AccessToken()
     access.set_exp(lifetime=timedelta(hours=1))
     access['id_account'] = account.id_account
     access['user'] = account.user
     access['subscription'] = account.subscription
+    access['type_account'] = type_account
 
-    # Debug: imprime payload para revisar
-    print("Access token payload:", access.payload)
-    print("Refresh token payload:", refresh.payload)
-
-    return Response({
-        "code": 1,
-        "message": "Acceso permitido",
-        "refresh": str(refresh),
-        "access": str(access),
-        "id_account": account.id_account,
-        "user": account.user,
-        "subscription": account.subscription
-    }, status=status.HTTP_200_OK)
+    return Response(
+        {
+            "code": 1,
+            "message": "Access granted.",
+            "refresh": str(refresh),
+            "access": str(access),
+            "id_account": account.id_account,
+            "user": account.user,
+            "subscription": account.subscription,
+            "type_account": type_account
+        },
+        status=status.HTTP_200_OK
+    )
 
 @api_view(['POST'])
 @permission_classes([])
@@ -428,3 +521,170 @@ def facebook_login(request):
         "user": account.user,
         "subscription": account.subscription
     })
+
+@api_view(['POST'])
+@permission_classes([])
+def recover_password(request):
+    account_value = request.data.get('account')
+    type_account = request.data.get('type_account')  # candidate | company
+
+    if not account_value or not type_account:
+        return Response(
+            {"code": 0, "message": "account and type_account are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Respuesta genérica (no filtrar existencia)
+    generic_response = {
+        "code": 1,
+        "message": "A new password has been sent to the registered email."
+    }
+
+    # -----------------------
+    # BUSCAR ACCOUNT
+    # -----------------------
+    account_obj = Account.objects.filter(
+        Q(user=account_value) | Q(email=account_value)
+    ).first()
+
+    if not account_obj:
+        return Response(generic_response, status=status.HTTP_200_OK)
+
+    # -----------------------
+    # OBTENER EMAIL SEGÚN TIPO
+    # -----------------------
+    email = None
+
+    if type_account == 'candidate':
+        candidate = Candidate.objects.filter(account_id=account_obj.id_account).first()
+        if candidate and candidate.email:
+            email = candidate.email
+
+    elif type_account == 'company':
+        company = Company.objects.filter(account_id=account_obj.id_account).first()
+        if company and company.email_pc:
+            email = company.email_pc
+
+    else:
+        return Response(
+            {"code": 0, "message": "Invalid type_account"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not email:
+        return Response(generic_response, status=status.HTTP_200_OK)
+
+    # -----------------------
+    # GENERAR NUEVA PASSWORD
+    # -----------------------
+    new_password = ''.join(
+        secrets.choice(string.ascii_letters + string.digits)
+        for _ in range(10)
+    )
+
+    # GUARDAR PASSWORD (TEXTO PLANO, COMO TU SISTEMA)
+    account_obj.password = new_password
+    account_obj.save()
+
+    print("email:", email)
+
+    # -----------------------
+    # ENVIAR EMAIL
+    # -----------------------
+    send_mail(
+        subject="Password recovery",
+        message=(
+            f"Your new password is:\n\n{new_password}\n\n"
+            "Please log in and change it after accessing the platform."
+        ),
+        from_email="no-reply@tuapp.com",
+        recipient_list=[email],
+        fail_silently=True
+    )
+
+    return Response(generic_response, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_password(request):
+    # ID del usuario autenticado
+    id_account = request.user.id_account
+
+    current_password = request.data.get('current_password')
+    new_password = request.data.get('new_password')
+
+    if not current_password or not new_password:
+        return Response(
+            {
+                "code": 0,
+                "message": "current_password and new_password are required"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # -----------------------
+    # OBTENER ACCOUNT
+    # -----------------------
+    try:
+        account = Account.objects.get(id_account=id_account)
+    except Account.DoesNotExist:
+        return Response(
+            {"code": 0, "message": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # -----------------------
+    # VALIDAR PASSWORD ACTUAL
+    # -----------------------
+    if account.password != current_password:
+        return Response(
+            {"code": 0, "message": "Current password is incorrect"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # -----------------------
+    # ACTUALIZAR PASSWORD
+    # -----------------------
+    account.password = new_password
+    account.save(update_fields=['password'])
+
+    return Response(
+        {
+            "code": 1,
+            "message": "Password updated successfully"
+        },
+        status=status.HTTP_200_OK
+    )
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    id_account = request.user.id_account
+
+    try:
+        account = Account.objects.get(id_account=id_account)
+    except Account.DoesNotExist:
+        return Response({"code": 0, "message": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    user_email = account.email
+
+    # Eliminamos la cuenta (y toda la info en cascada)
+    account.delete()
+
+    # Enviamos correo de despedida
+    send_mail(
+        subject="We hope to see you again soon!",
+        message=(
+            f"Hello {user_email},\n\n"
+            "Your account has been successfully deleted.\n\n"
+            "We hope to see you back on our platform soon!\n\n"
+            "Best regards,\n"
+            "Professional Hospitality Connections"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user_email],
+        fail_silently=True
+    )
+
+    return Response({"code": 1, "message": "Account and all related data deleted successfully"}, status=status.HTTP_200_OK)

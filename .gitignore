@@ -107,3 +107,8 @@ staticfiles/
 *.jp2
 *.heic
 *.heif
+
+*.pdf 
+*.docx 
+*.xlsx
+*.pptx 

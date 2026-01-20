@@ -72,6 +72,7 @@ def get_candidate(request):
     serializer = CandidateSerializer(candidate, context={'request': request})
     response_data = serializer.data
     response_data["schedule"] = schedule_data
+    #print(response_data)
 
     return Response(response_data, status=200)
 
@@ -151,6 +152,7 @@ def create_candidate(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_candidate(request):
+    print(request.data)
     try:
         candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
@@ -286,7 +288,7 @@ def apply_to_job(request):
     JobApplication.objects.create(
         id_candidate=candidate,
         id_jobs=job,
-        status='applied'
+        status='application_submitted'
     )
 
     return Response(
@@ -527,16 +529,16 @@ def format_date(date):
 @permission_classes([IsAuthenticated])
 def my_applications(request):
     id_candidate = request.data.get("id_candidate")
-    title = request.data.get("title")       # directamente title
-    company = request.data.get("company")   # directamente company
+    title = request.data.get("title")
+    company = request.data.get("company")
 
     if not id_candidate:
         return Response({"message": "id_candidate is required"}, status=400)
 
-    # Traemos las aplicaciones con jobs y compañías en un solo query
-    applications = JobApplication.objects.filter(id_candidate=id_candidate).select_related('id_jobs__company')
+    applications = JobApplication.objects.filter(
+        id_candidate=id_candidate
+    ).select_related('id_jobs__company')
 
-    # Aplicar filtros si vienen en el request
     if title:
         applications = applications.filter(id_jobs__title__icontains=title)
     if company:
@@ -544,19 +546,25 @@ def my_applications(request):
 
     applications = applications.order_by("-created_at")
 
+    STATUS_LABELS = {
+        "application_submitted": "application submitted",
+        "application_viewed": "application viewed",
+    }
+
     result = []
 
     for app in applications:
         job = app.id_jobs
         company_obj = job.company
 
-        # Serializar job y compañía
         job_data = JobSerializer(job).data
-        job_data["company"] = CompanySerializer(company_obj, context={"request": request}).data
+        job_data["company"] = CompanySerializer(
+            company_obj, context={"request": request}
+        ).data
 
         result.append({
             "id_job_application": app.id_job_application,
-            "status": app.status,
+            "status": STATUS_LABELS.get(app.status, app.status),
             "created_at": format_date(app.created_at),
             "updated_at": format_date(app.updated_at),
             "job": job_data

@@ -19,7 +19,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             'address', 'education', 'status', 'radius', 'adult', 'work_permission',
             'web_link', 'about', 'photo', 'desired_position', 'years_experience', 
             'last_position', 'last_company','email', 'job_type', 'employment_type', 
-            'modality','salary', 'cvu'
+            'modality','salary', 'cvu', 'servsafe', 'emergency_contact_name', 'emergency_contact_phone'
         ]
 
     def create(self, validated_data):

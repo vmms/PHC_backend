@@ -21,7 +21,18 @@ from candidates.serializers import CandidatePublicSerializer, CandidateContactSe
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime, time
+from django.utils import timezone
 import json
+
+WEEKDAY_MAP = {
+    0: "mon",
+    1: "tue",
+    2: "wed",
+    3: "thu",
+    4: "fri",
+    5: "sat",
+    6: "sun",
+}
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -365,10 +376,24 @@ def list_my_jobs(request):
 
     return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
 
+def mark_application_as_viewed(id_job_application):
+    if not id_job_application:
+        return
+
+    JobApplication.objects.filter(
+        id_job_application=id_job_application
+    ).update(
+        status="application_viewed",
+        updated_at=timezone.now()
+    )
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_candidate_public(request):
+    print(request.data)
     id_candidate = request.data.get('id_candidate')
+    id_job_application = request.data.get("id_job_application")
+    
 
     if not id_candidate:
         return Response(
@@ -381,9 +406,10 @@ def get_candidate_public(request):
         id_candidate=id_candidate
     )
 
-    # -----------------------------
-    # Schedule (misma lógica)
-    # -----------------------------
+    if id_job_application:
+        mark_application_as_viewed(id_job_application)
+
+    # -------- Schedule (tu lógica intacta) --------
     temp_schedule = defaultdict(list)
 
     for link in CandidateHasSchedule.objects.filter(candidate=candidate).select_related('schedule'):
@@ -432,13 +458,11 @@ def get_candidate_public(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_candidate_contact_info(request):
-    id_candidate = request.data.get('id_candidate')
+    id_candidate = request.data.get("id_candidate")
+    id_job_application = request.data.get("id_job_application")
 
-    if not id_candidate:
-        return Response(
-            {'error': 'id_candidate is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if id_job_application:
+        mark_application_as_viewed(id_job_application)
 
     candidate = get_object_or_404(
         Candidate,
@@ -447,10 +471,10 @@ def get_candidate_contact_info(request):
 
     serializer = CandidateContactSerializer(
         candidate,
-        context={'request': request}
+        context={"request": request}
     )
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.data, status=status.HTTP_200_OK) 
 
 def parse_date(d):
     if not d:
@@ -729,7 +753,6 @@ def search_candidates(request):
             multiples = []
 
         for cand in candidates_data:
-            # print(cand["first_name"])
             match = False
 
             # --- FILTRO POR RANGE ---
@@ -741,13 +764,11 @@ def search_candidates(request):
                 r_hour_end = parse_time(r.get("hour_end"))
 
                 for sched in cand.get("schedule", []):
-                    # print(sched.get("hired_date"))
                     hired_date = parse_date(sched.get("hired_date"))
                     if not hired_date:
                         continue
 
                     # Paso 1: hired_date dentro del rango
-                    hired_date = parse_date(sched.get("hired_date"))
                     if not (
                         hired_date < r_date_start or
                         (r_date_start <= hired_date <= r_date_end)
@@ -765,43 +786,58 @@ def search_candidates(request):
                     if match:
                         break
 
+                # 🔹 Guardar candidato si hubo match en RANGE
+                if match:
+                    filtered_candidates.append(cand)
+
             # --- FILTRO POR MULTIPLE ---
             elif multiples:
-                candidate_schedule = cand.get("schedule", [])
-                if not candidate_schedule:
-                    continue  # candidato no tiene schedule
+                # 🔹 Siempre tomar los días del schedule permanente
+                permanent_days = []
 
-                sched = candidate_schedule[0]  # tomamos el único schedule
-                candidate_days = sched.get("days", sched.get("dates", []))
+                for sched in cand.get("schedule", []):
+                    if sched.get("type") == "permanent":
+                        permanent_days = sched.get("days", [])
+                        break
 
-                all_match = True  # asumimos que todas las fechas del JSON coinciden
+                if not permanent_days:
+                    continue
+
+                match_found = False
+
                 for m_item in multiples:
                     m_date = parse_date(m_item.get("date_start"))
+                    if not m_date:
+                        continue
+
+                    m_weekday = WEEKDAY_MAP[m_date.weekday()]
                     m_hour_start = parse_time(m_item.get("hour_start"))
                     m_hour_end = parse_time(m_item.get("hour_end"))
 
-                    # Buscar un day del candidato que coincida con la fecha del JSON
-                    day_found = False
-                    for d in candidate_days:
-                        day_hired_date = parse_date(d.get("hired_date"))
-                        if day_hired_date != m_date:
+                    for d in permanent_days:
+                        # hired_date
+                        d_hired_date = parse_date(d.get("hired_date"))
+                        if d_hired_date and m_date < d_hired_date:
                             continue
 
+                        # día de la semana
+                        if d.get("day") != m_weekday:
+                            continue
+
+                        # cruce horario
                         day_start = parse_time(d.get("time_start"))
                         day_end = parse_time(d.get("time_end"))
+
                         if hours_intersect(m_hour_start, m_hour_end, day_start, day_end):
-                            day_found = True
+                            match_found = True
                             break
 
-                    if not day_found:
-                        all_match = False
-                        break  # esta fecha del JSON no coincide con ningún day del candidato
+                    if match_found:
+                        break
 
-                if all_match:
-                    match = True
-
-            if match:
-                filtered_candidates.append(cand)
+                # 🔹 Guardar candidato si hubo match en MULTIPLE
+                if match_found:
+                    filtered_candidates.append(cand)
 
     else:
         print("no filtrar por hora")

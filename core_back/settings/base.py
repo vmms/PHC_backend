@@ -29,12 +29,12 @@ DEBUG = False    # cada ambiente lo cambia
 ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
-    '1057e5614f87.ngrok-free.app'
+    '9eed35315433.ngrok-free.app'
     ]
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://1057e5614f87.ngrok-free.app ", 
+    "https://9eed35315433.ngrok-free.app", 
     "https://ruthe-unretributive-superscientifically.ngrok-free.dev",
     ]
 
@@ -167,6 +167,19 @@ STATIC_URL = 'static/'
 # -------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# -------------------
+# EMAIL
+# -------------------
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = 'info@professionalhospitalityconnections.com'
+EMAIL_HOST_PASSWORD = 'gqfmwwinvomrdwgi'
+
+DEFAULT_FROM_EMAIL = 'Professional Hospitality Connections <info@professionalhospitalityconnections.com>'

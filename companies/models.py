@@ -40,7 +40,6 @@ class Company(models.Model):
     link = models.CharField(max_length=100)
     logo = models.ImageField(upload_to=CompanyLogoPath(), null=True, blank=True)
 
-
     class Meta:
         db_table = "company"
         managed = False
