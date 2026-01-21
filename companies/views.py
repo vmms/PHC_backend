@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import Company
-from .serializers import CompanySerializer
+from .serializers import CompanySerializer, CompanyAdminSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Exists, OuterRef
@@ -40,17 +40,21 @@ def list_companies(request):
     try:
         companies = Company.objects.all()
 
-        if not companies.exists():
-            return Response({"message": "No companies found", "results": []}, status=status.HTTP_200_OK)
+        total = companies.count()  # Número total de companies
 
-        return Response(companies, status=status.HTTP_200_OK)
+        serializer = CompanyAdminSerializer(companies, many=True, context={'request': request})
+
+        return Response({
+            "total": total,
+            "companies": serializer.data
+        }, status=status.HTTP_200_OK)
 
     except DatabaseError:
         return Response({"error": "Database error while fetching companies"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
-        # Cualquier error inesperado
         return Response({"error": "Unexpected server error", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -58,7 +62,7 @@ def get_company(request):
     try:
         # Usar account_id en lugar de account
         company = Company.objects.get(account_id=request.user.id_account)
-        serializer = CompanySerializer(company, context={'request': request})
+        serializer = CompanyAdminSerializer(company, context={'request': request})
         return Response(serializer.data, status=200)
     except Company.DoesNotExist:
         return Response(
@@ -493,6 +497,7 @@ def hours_intersect(start1, end1, start2, end2):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def search_candidates(request):
+    print("request.data:")
     print(request.data)
     data = request.data or {}
 

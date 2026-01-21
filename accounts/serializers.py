@@ -69,4 +69,14 @@ class ErrorResponseSerializer(serializers.Serializer):
     class Meta:
         ref_name = "ErrorResponse"
 
-
+class AccountAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = [
+            'id_account',
+            'status',
+            'user',
+            'email',
+            'subscription',
+            'observations_admin'
+        ]

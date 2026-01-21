@@ -11,6 +11,8 @@ class Account(models.Model):
     google_id = models.CharField(max_length=255, null=True, blank=True)
     facebook_id = models.CharField(max_length=255, null=True, blank=True)
 
+    observations_admin = models.TextField(null=True, blank=True)  
+
     class Meta:
         managed = False
         db_table = 'account'  # nombre exacto de tu tabla en MySQL

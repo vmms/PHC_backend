@@ -5,12 +5,16 @@ from education.models import Education
 from addresses.serializers import AddressSerializer
 from addresses.serializers import AddressPublicSerializer
 from education.serializers import EducationSerializer, EducationPublicSerializer
+from schedulers.models import Scheduler  
+from schedulers.serializers import SchedulerSerializer 
+from accounts.serializers import AccountAdminSerializer
 
 
 class CandidateSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
     education = EducationSerializer()
     account = serializers.PrimaryKeyRelatedField(read_only=True)
+    schedules = serializers.SerializerMethodField()
     
     class Meta:
         model = Candidate
@@ -19,7 +23,8 @@ class CandidateSerializer(serializers.ModelSerializer):
             'address', 'education', 'status', 'radius', 'adult', 'work_permission',
             'web_link', 'about', 'photo', 'desired_position', 'years_experience', 
             'last_position', 'last_company','email', 'job_type', 'employment_type', 
-            'modality','salary', 'cvu', 'servsafe', 'emergency_contact_name', 'emergency_contact_phone'
+            'modality','salary', 'cvu', 'servsafe', 'emergency_contact_name', 'emergency_contact_phone',
+            'schedules'
         ]
 
     def create(self, validated_data):
@@ -101,6 +106,12 @@ class CandidateSerializer(serializers.ModelSerializer):
             # Si no hay request, regresa solo la URL relativa
             return obj.photo.url
         return None
+    
+    def get_schedules(self, obj):  # <- este método DEBE estar dentro de la clase
+        schedules_qs = Scheduler.objects.filter(candidatehasschedule__candidate=obj)
+        serializer = SchedulerSerializer(schedules_qs, many=True)
+        return serializer.data
+
 
 class CandidatePublicSerializer(serializers.ModelSerializer):
     address = AddressPublicSerializer(read_only=True)
@@ -141,3 +152,49 @@ class CandidateContactSerializer(serializers.ModelSerializer):
             'phone_number',
             'address',
         ]
+
+class CandidateAdminSerializer(serializers.ModelSerializer):
+    address = AddressSerializer()
+    education = EducationSerializer()
+    account = AccountAdminSerializer(read_only=True)
+    schedules = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Candidate
+        fields = [
+            'id_candidate',
+            'account',
+            'first_name',
+            'last_name',
+            'phone_number',
+            'email',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'address',
+            'education',
+            'desired_position',
+            'years_experience',
+            'last_position',
+            'last_company',
+            'job_type',
+            'employment_type',
+            'modality',
+            'salary',
+            'status',
+            'is_active',
+            'radius',
+            'adult',
+            'work_permission',
+            'web_link',
+            'about',
+            'photo',
+            'cvu',
+            'servsafe',
+            'schedules',
+        ]
+
+    def get_schedules(self, obj):
+        schedules = Scheduler.objects.filter(
+            candidatehasschedule__candidate=obj
+        )
+        return SchedulerSerializer(schedules, many=True).data

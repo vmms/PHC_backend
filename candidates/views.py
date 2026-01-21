@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import Candidate, CandidateHasSchedule
-from .serializers import CandidateSerializer
+from .serializers import CandidateSerializer, CandidateAdminSerializer
 from collections import defaultdict
 
 from jobs.models import Job, SkillsHasJobs, ScheduleHasJobs
@@ -241,9 +241,22 @@ def list_candidates(request):
     """
     Lista todos los candidates (solo admin o debugging).
     """
-    candidates = Candidate.objects.all()
-    serializer = CandidateSerializer(candidates, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    try:
+        candidates = Candidate.objects.all()
+        total = candidates.count()  # Número total de candidatos
+
+        serializer = CandidateAdminSerializer(candidates, many=True, context={'request': request})
+
+        return Response({
+            "total": total,
+            "candidates": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "error": "Unexpected server error",
+            "details": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

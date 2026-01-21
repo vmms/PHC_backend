@@ -64,6 +64,7 @@ class Candidate(models.Model):
     modality = models.CharField(max_length=45, null=True, blank=True)
     salary = models.CharField(max_length=75)
     servsafe = models.CharField(max_length=25, default='na')
+    is_active = models.BooleanField(default=False)
 
 
     class Meta:

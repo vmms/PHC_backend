@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Company
 from addresses.models import Address
 from addresses.serializers import AddressSerializer
+from accounts.serializers import AccountAdminSerializer
 
 class CompanySerializer(serializers.ModelSerializer):
     address = AddressSerializer()
@@ -44,3 +45,32 @@ class CompanySerializer(serializers.ModelSerializer):
             # Construye la URL absoluta usando el request
             return request.build_absolute_uri(obj.logo.url)
         return None
+
+
+class CompanyAdminSerializer(serializers.ModelSerializer):
+    address = AddressSerializer(read_only=True)
+    account = AccountAdminSerializer(read_only=True)
+
+    class Meta:
+        model = Company
+        fields = [
+            'id_company',
+            'name',
+            'account',              # incluye observations_admin
+            'address',
+            'type_business',
+
+            'primary_contact',
+            'title_pc',
+            'phone_number_pc',
+            'email_pc',
+
+            'secondary_contact',
+            'title_sc',
+            'phone_number_sc',
+            'email_sc',
+
+            'description',
+            'link',
+            'logo'
+        ]
