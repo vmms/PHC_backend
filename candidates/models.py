@@ -66,6 +66,8 @@ class Candidate(models.Model):
     servsafe = models.CharField(max_length=25, default='na')
     is_active = models.BooleanField(default=False)
 
+    profile_views = models.PositiveIntegerField(default=0)
+    cvu_downloads = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = "candidate"

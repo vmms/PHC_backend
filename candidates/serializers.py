@@ -8,6 +8,7 @@ from education.serializers import EducationSerializer, EducationPublicSerializer
 from schedulers.models import Scheduler  
 from schedulers.serializers import SchedulerSerializer 
 from accounts.serializers import AccountAdminSerializer
+from jobApplication.models import JobApplication
 
 
 class CandidateSerializer(serializers.ModelSerializer):
@@ -158,6 +159,7 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
     education = EducationSerializer()
     account = AccountAdminSerializer(read_only=True)
     schedules = serializers.SerializerMethodField()
+    job_applications_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Candidate
@@ -191,6 +193,9 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
             'cvu',
             'servsafe',
             'schedules',
+            'profile_views', 
+            'cvu_downloads',
+            'job_applications_count',
         ]
 
     def get_schedules(self, obj):
@@ -198,3 +203,7 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
             candidatehasschedule__candidate=obj
         )
         return SchedulerSerializer(schedules, many=True).data
+    
+    def get_job_applications_count(self, obj):
+        return JobApplication.objects.filter(id_candidate=obj).count()
+

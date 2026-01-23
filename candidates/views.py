@@ -666,6 +666,9 @@ def download_cvu(request):
 
     if not os.path.exists(file_path):
         return Response({'error': 'File does not exist'}, status=404)
+    
+    candidate.cvu_downloads += 1
+    candidate.save(update_fields=['cvu_downloads'])
 
     download_name = f'{candidate.first_name}_{candidate.last_name}_CV.pdf'
     #print(download_name)

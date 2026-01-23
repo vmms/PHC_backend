@@ -473,6 +473,9 @@ def get_candidate_contact_info(request):
         id_candidate=id_candidate
     )
 
+    candidate.profile_views += 1
+    candidate.save(update_fields=['profile_views'])
+
     serializer = CandidateContactSerializer(
         candidate,
         context={"request": request}

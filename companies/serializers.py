@@ -3,6 +3,7 @@ from .models import Company
 from addresses.models import Address
 from addresses.serializers import AddressSerializer
 from accounts.serializers import AccountAdminSerializer
+from jobs.models import Job
 
 class CompanySerializer(serializers.ModelSerializer):
     address = AddressSerializer()
@@ -50,6 +51,8 @@ class CompanySerializer(serializers.ModelSerializer):
 class CompanyAdminSerializer(serializers.ModelSerializer):
     address = AddressSerializer(read_only=True)
     account = AccountAdminSerializer(read_only=True)
+    total_jobs = serializers.SerializerMethodField()
+    active_jobs = serializers.SerializerMethodField()
 
     class Meta:
         model = Company
@@ -72,5 +75,14 @@ class CompanyAdminSerializer(serializers.ModelSerializer):
 
             'description',
             'link',
-            'logo'
+            'logo',
+
+            'total_jobs',
+            'active_jobs',
         ]
+    
+    def get_total_jobs(self, obj):
+        return Job.objects.filter(company_id=obj.id_company).count()
+
+    def get_active_jobs(self, obj):
+        return Job.objects.filter(company_id=obj.id_company, is_active=True).count()
