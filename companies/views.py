@@ -497,8 +497,8 @@ def hours_intersect(start1, end1, start2, end2):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def search_candidates(request):
-    print("request.data:")
-    print(request.data)
+    #print("request.data:")
+    #print(request.data)
     data = request.data or {}
 
     # -----------------------------------
@@ -515,7 +515,7 @@ def search_candidates(request):
     # -----------------------------------
     # 2. Base queryset
     # -----------------------------------
-    candidates = Candidate.objects.filter(status='active').select_related('address')
+    candidates = Candidate.objects.filter(is_active=1).select_related('address')
 
     # -----------------------------------
     # 3. Filtros simples
@@ -745,7 +745,7 @@ def search_candidates(request):
     filtered_candidates = []
 
     if schedule_str:  # viene algo del frontend
-        print("filtra por hora")
+        #print("filtra por hora")
         try:
             print("parsear el JSON del string")
             schedule_data = json.loads(schedule_str)
@@ -845,8 +845,8 @@ def search_candidates(request):
                     filtered_candidates.append(cand)
 
     else:
-        print("no filtrar por hora")
+        #print("no filtrar por hora")
         filtered_candidates = candidates_data
 
-    print(filtered_candidates)
+    #print(filtered_candidates)
     return Response({"candidates": filtered_candidates}, status=200)

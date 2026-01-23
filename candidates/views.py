@@ -273,6 +273,14 @@ def apply_to_job(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
+    if not candidate.is_active:
+        return Response(
+            {
+                "message": "Your candidate profile is inactive. You cannot apply for jobs."
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     # obtener id del job
     job_id = request.data.get('job_id')
     if not job_id:
@@ -675,3 +683,42 @@ def download_cvu(request):
     response['Content-Length'] = os.path.getsize(file_path)
 
     return response
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def toggle_candidate_active(request):
+    """
+    Toggle del campo is_active del candidato.
+    El id_candidate viene en el body (JSON).
+    """
+    try:
+        id_candidate = request.data.get('id_candidate')
+
+        if not id_candidate:
+            return Response(
+                {"error": "id_candidate is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        candidate = Candidate.objects.get(id_candidate=id_candidate)
+
+        candidate.is_active = not candidate.is_active
+        candidate.save(update_fields=['is_active'])
+
+        return Response({
+            "message": "Candidate is_active updated successfully",
+            "id_candidate": candidate.id_candidate,
+            "is_active": candidate.is_active
+        }, status=status.HTTP_200_OK)
+
+    except Candidate.DoesNotExist:
+        return Response(
+            {"error": "Candidate not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": "Unexpected server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

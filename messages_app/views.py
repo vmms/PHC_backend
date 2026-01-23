@@ -26,6 +26,24 @@ def create_message(request):
         return Response({"error": "message is required"}, status=400)
 
     # -------------------------------------------------------
+    # VALIDAR SI EL EMISOR (CANDIDATO) ESTÁ ACTIVO
+    # -------------------------------------------------------
+    if account_type == "candidate":
+        try:
+            sender_candidate = Candidate.objects.get(account=user_account)
+        except Candidate.DoesNotExist:
+            return Response(
+                {"error": "Candidate profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not sender_candidate.is_active:
+            return Response(
+                {"error": "Inactive candidates cannot send messages"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+    # -------------------------------------------------------
     # Determinar receiver_account_id
     # -------------------------------------------------------
     if account_type == "candidate":
@@ -42,6 +60,15 @@ def create_message(request):
             return Response({"error": "Must send receiver_candidate_id"}, status=400)
         try:
             candidate = Candidate.objects.get(id_candidate=receiver_candidate_id)
+            # -------------------------------------------------------
+            # VALIDAR SI EL RECEPTOR (CANDIDATO) ESTÁ ACTIVO
+            # -------------------------------------------------------
+            if not candidate.is_active:
+                return Response(
+                    {"error": "Cannot send messages to an inactive candidate"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+                
             receiver_account_id = candidate.account_id
         except Candidate.DoesNotExist:
             return Response({"error": "Candidate not found"}, status=404)

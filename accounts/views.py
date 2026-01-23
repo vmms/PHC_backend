@@ -688,3 +688,49 @@ def delete_account(request):
     )
 
     return Response({"code": 1, "message": "Account and all related data deleted successfully"}, status=status.HTTP_200_OK)
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def observations_admin(request):
+    """
+    Actualiza el campo observations_admin de un Account (solo admin).
+    El id_account y el texto vienen en el body.
+    """
+    try:
+        id_account = request.data.get('id_account')
+        observations_admin = request.data.get('observations_admin')
+
+        if not id_account:
+            return Response(
+                {"error": "id_account is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if observations_admin is None:
+            return Response(
+                {"error": "observations_admin is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        account = Account.objects.get(id_account=id_account)
+
+        account.observations_admin = observations_admin
+        account.save(update_fields=['observations_admin'])
+
+        return Response({
+            "message": "observations_admin updated successfully",
+            "id_account": account.id_account,
+            "observations_admin": account.observations_admin
+        }, status=status.HTTP_200_OK)
+
+    except Account.DoesNotExist:
+        return Response(
+            {"error": "Account not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": "Unexpected server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
