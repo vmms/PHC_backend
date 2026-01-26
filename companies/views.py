@@ -1008,3 +1008,49 @@ def toggle_company_active(request):
             {"error": "Server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_company_subscription(request):
+    id_company = request.data.get('id_company')
+    new_subscription = request.data.get('subscription')
+
+    if not id_company or not new_subscription:
+        return Response(
+            {"error": "id_company and subscription are required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if new_subscription not in ['basic', 'premium']:
+        return Response(
+            {"error": "Invalid subscription value"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        company = Company.objects.get(id_company=id_company)
+
+        company.subscription = new_subscription
+        company.save(update_fields=['subscription'])
+
+        return Response(
+            {
+                "success": True,
+                "id_company": company.id_company,
+                "subscription": company.subscription
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Company.DoesNotExist:
+        return Response(
+            {"error": "Company not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": "Server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
