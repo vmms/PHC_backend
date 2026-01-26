@@ -940,3 +940,34 @@ def admin_search_companies(request):
         "companies": serializer.data
     })
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def company_admin_detail(request):
+    id_company = request.data.get('id_company')
+
+    if not id_company:
+        return Response(
+            {"error": "id_company is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        company = Company.objects.select_related(
+            'account',
+            'address'
+        ).get(id_company=id_company)
+
+    except Company.DoesNotExist:
+        return Response(
+            {"error": "Company not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = CompanyAdminSerializer(
+        company,
+        context={"request": request}
+    )
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
