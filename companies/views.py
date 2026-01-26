@@ -17,6 +17,7 @@ from jobApplication.models import JobApplication
 from jobApplication.serializers import JobApplicationSerializer
 from candidates.models import Candidate, CandidateHasSchedule
 from candidates.serializers import CandidatePublicSerializer, CandidateContactSerializer
+from companies.services import get_company_admin_stats
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
@@ -465,6 +466,9 @@ def get_candidate_contact_info(request):
     id_candidate = request.data.get("id_candidate")
     id_job_application = request.data.get("id_job_application")
 
+    if not id_candidate:
+        return Response({"error": "id_candidate is required"}, status=400)
+
     if id_job_application:
         mark_application_as_viewed(id_job_application)
 
@@ -473,8 +477,20 @@ def get_candidate_contact_info(request):
         id_candidate=id_candidate
     )
 
-    candidate.profile_views += 1
-    candidate.save(update_fields=['profile_views'])
+    try:
+        company = Company.objects.get(account_id=request.user.id_account)
+        company.profile_views += 1
+        company.save(update_fields=['profile_views'])
+    except Company.DoesNotExist:
+        return Response({"error": "Compañía no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": "Error del servidor", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    is_admin = request.user.subscription == 'ADMIN'
+
+    if not is_admin:
+        candidate.profile_views += 1
+        candidate.save(update_fields=['profile_views'])
 
     serializer = CandidateContactSerializer(
         candidate,
@@ -500,8 +516,8 @@ def hours_intersect(start1, end1, start2, end2):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def search_candidates(request):
-    #print("request.data:")
-    #print(request.data)
+    # print("request.data:")
+    # print(request.data)
     data = request.data or {}
 
     # -----------------------------------
@@ -750,12 +766,12 @@ def search_candidates(request):
     if schedule_str:  # viene algo del frontend
         #print("filtra por hora")
         try:
-            print("parsear el JSON del string")
+            # print("parsear el JSON del string")
             schedule_data = json.loads(schedule_str)
             ranges = schedule_data.get("range", [])
-            print("ranges",ranges)
+            # print("ranges",ranges)
             multiples = schedule_data.get("multiple", [])
-            print("multiples",multiples)
+            # print("multiples",multiples)
         except (ValueError, TypeError, json.JSONDecodeError):
             ranges = []
             multiples = []
@@ -853,3 +869,20 @@ def search_candidates(request):
 
     #print(filtered_candidates)
     return Response({"candidates": filtered_candidates}, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def company_admin_stats(request):
+    try:
+        data = get_company_admin_stats()
+        return Response(data, status=200)
+
+    except Exception as e:
+        return Response(
+            {
+                "error": "Unable to retrieve company admin stats",
+                "details": str(e)
+            },
+            status=500
+        )
+

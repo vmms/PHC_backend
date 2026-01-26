@@ -53,6 +53,10 @@ class CompanyAdminSerializer(serializers.ModelSerializer):
     account = AccountAdminSerializer(read_only=True)
     total_jobs = serializers.SerializerMethodField()
     active_jobs = serializers.SerializerMethodField()
+    preferred_contact = serializers.SerializerMethodField()
+    
+    created_at = serializers.DateTimeField(format="%m/%d/%Y", read_only=True)
+    updated_at = serializers.DateTimeField(format="%m/%d/%Y", read_only=True)
 
     class Meta:
         model = Company
@@ -79,6 +83,13 @@ class CompanyAdminSerializer(serializers.ModelSerializer):
 
             'total_jobs',
             'active_jobs',
+
+            'created_at',
+            'updated_at',
+            'profile_views',
+            'cvu_downloads',
+            'preferred_contact',
+            'subscription',
         ]
     
     def get_total_jobs(self, obj):
@@ -86,3 +97,10 @@ class CompanyAdminSerializer(serializers.ModelSerializer):
 
     def get_active_jobs(self, obj):
         return Job.objects.filter(company_id=obj.id_company, is_active=True).count()
+    
+    def get_preferred_contact(self, obj):
+        # Comparar cuál es mayor
+        if obj.first_contact_applications >= obj.first_contact_search:
+            return "Applications"
+        else:
+            return "Search"

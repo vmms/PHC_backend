@@ -66,6 +66,9 @@ def create_account(request):
                 id_account=account.id_account,
                 email=account.email
             )
+        
+        elif account.subscription == "admin":
+            pass 
 
         send_mail(
             subject="Welcome to Professional Hospitality Connections",
@@ -339,28 +342,41 @@ def token_login(request):
     # -------------------------------
     # VALIDATE ACCOUNT TYPE
     # -------------------------------
-    is_company = Company.objects.filter(account=account).exists()
-    is_candidate = Candidate.objects.filter(account=account).exists()
-    print(is_company)
-    print(is_candidate)
+    
+    # ADMIN
+    if type_account == 'admin':
+        if account.subscription != 'admin':
+            return Response(
+                {
+                    "code": 0,
+                    "message": "This account is not an admin account."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-    if type_account == 'company' and not is_company:
-        return Response(
-            {
-                "code": 0,
-                "message": "This account is not a company account. Please log in as a candidate."
-            },
-            status=status.HTTP_403_FORBIDDEN
-        )
+    # COMPANY / CANDIDATE
+    else:
+        is_company = Company.objects.filter(account=account).exists()
+        is_candidate = Candidate.objects.filter(account=account).exists()
 
-    if type_account == 'candidate' and not is_candidate:
-        return Response(
-            {
-                "code": 0,
-                "message": "This account is not a candidate account. Please log in as a company."
-            },
-            status=status.HTTP_403_FORBIDDEN
-        )
+        if type_account == 'company' and not is_company:
+            return Response(
+                {
+                    "code": 0,
+                    "message": "This account is not a company account. Please log in as a candidate."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if type_account == 'candidate' and not is_candidate:
+            return Response(
+                {
+                    "code": 0,
+                    "message": "This account is not a candidate account. Please log in as a company."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
 
     # -------------------------------
     # CREATE TOKENS

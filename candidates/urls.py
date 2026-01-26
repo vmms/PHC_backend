@@ -16,4 +16,6 @@ urlpatterns = [
     path('load_cvu/', views.load_cvu, name='load_cvu'),
     path('download_cvu/', views.download_cvu, name='download_cvu'),
     path('toggle_candidate_active/', views.toggle_candidate_active, name='toggle_candidate_active'),
+    path('search_candidate_admin/', views.search_candidate_admin, name='search_candidate_admin'),
+    path('candidate_admin_stats/', views.candidate_admin_stats, name='candidate_admin_stats'),
 ]

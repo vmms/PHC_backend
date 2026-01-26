@@ -14,18 +14,28 @@ from jobApplication.models import JobApplication
 from schedulers.models import Scheduler
 from companies.models import Company
 from companies.serializers import CompanySerializer
+from candidates.services import get_candidate_admin_stats
 
 from django.utils.deconstruct import deconstructible
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.core.files.storage import default_storage
+
+from datetime import timedelta
+from django.utils import timezone
 
 import os
 import time
+import json
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
+
+from candidates.services import parse_date, parse_time, hours_intersect
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -152,7 +162,7 @@ def create_candidate(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_candidate(request):
-    print(request.data)
+    # print(request.data)
     try:
         candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
@@ -242,7 +252,10 @@ def list_candidates(request):
     Lista todos los candidates (solo admin o debugging).
     """
     try:
-        candidates = Candidate.objects.all()
+        candidates = Candidate.objects.all().order_by(
+            '-created_at',   # más nuevos primero
+            'first_name'     # luego por nombre
+        )
         total = candidates.count()  # Número total de candidatos
 
         serializer = CandidateAdminSerializer(candidates, many=True, context={'request': request})
@@ -621,7 +634,7 @@ def load_cvu(request):
     cvu_file = request.FILES['cvu']
 
     # -----------------------------
-    # Validar que sea PDF
+    # Validar PDF
     # -----------------------------
     if cvu_file.content_type != 'application/pdf':
         return Response(
@@ -636,7 +649,17 @@ def load_cvu(request):
         )
 
     # -----------------------------
-    # Guardar / sobrescribir CVU
+    # BORRAR CVU EXISTENTE (si hay)
+    # -----------------------------
+    if candidate.cvu:
+        if default_storage.exists(candidate.cvu.name):
+            default_storage.delete(candidate.cvu.name)
+
+        # Limpia el campo en memoria
+        candidate.cvu = None
+
+    # -----------------------------
+    # Guardar nuevo CVU
     # -----------------------------
     candidate.cvu.save(
         cvu_file.name,
@@ -645,9 +668,10 @@ def load_cvu(request):
     )
 
     return Response(
-        {"message": "Your CV file has been updated"}, 
+        {"message": "Your CV file has been updated"},
         status=status.HTTP_200_OK
     )
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -666,24 +690,32 @@ def download_cvu(request):
 
     if not os.path.exists(file_path):
         return Response({'error': 'File does not exist'}, status=404)
-    
-    candidate.cvu_downloads += 1
-    candidate.save(update_fields=['cvu_downloads'])
 
-    download_name = f'{candidate.first_name}_{candidate.last_name}_CV.pdf'
-    #print(download_name)
-    
-    with open(file_path, 'rb') as f:
-        response = HttpResponse(
-            f.read(),
-            content_type='application/pdf'
-        )
+    user_account = request.user
 
-    response['Content-Disposition'] = (
-        f'attachment; filename="{download_name}"'
+    if user_account.subscription == 'ADMIN':
+        # Los admins solo descargan, no cuentan
+        pass
+    elif user_account.subscription in ['company']:
+        try:
+            company = Company.objects.get(account_id=user_account.id_account)
+            company.cvu_downloads += 1
+            company.save(update_fields=['cvu_downloads'])
+        except Company.DoesNotExist:
+            return Response(
+                {"error": "Company not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    else:
+        # Otros usuarios no deben incrementar nada
+        pass
+
+    download_name = f'{candidate.first_name}_{candidate.last_name}.pdf'
+
+    response = FileResponse(
+        open(file_path, 'rb'),
+        content_type='application/pdf'
     )
-
-    response['Content-Length'] = os.path.getsize(file_path)
 
     return response
 
@@ -724,4 +756,287 @@ def toggle_candidate_active(request):
         return Response(
             {"error": "Unexpected server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+from django.db.models import Count, Q
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def search_candidate_admin(request):
+    # print(request.data)
+
+    try:
+        data = request.data or {}
+
+        # -------------------------------
+        # INPUTS
+        # -------------------------------
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        desired_position = data.get('desired_position')
+        job_type = data.get('job_type')
+        employment_type = data.get('employment_type')
+        modality = data.get('modality')
+        salary = data.get('salary')
+        is_active = data.get('is_active')
+
+        last_position = data.get('last_position')
+        adult = data.get('adult')
+        work_permission = data.get('work_permission')
+        years_experience = data.get('years_experience')
+        servsafe = data.get('servsafe')
+
+        schedule_input = data.get('schedule')
+        order_by = data.get('order_by')
+
+        candidates = Candidate.objects.all()
+
+        # -------------------------------
+        # FILTERS
+        # -------------------------------
+        if first_name:
+            candidates = candidates.filter(first_name__icontains=first_name)
+
+        if last_name:
+            candidates = candidates.filter(last_name__icontains=last_name)
+
+        if desired_position:
+            candidates = candidates.filter(desired_position__icontains=desired_position)
+
+        if last_position:
+            candidates = candidates.filter(last_position__icontains=last_position)
+
+        if job_type:
+            candidates = candidates.filter(job_type=job_type)
+
+        if employment_type:
+            candidates = candidates.filter(employment_type=employment_type)
+
+        if modality:
+            candidates = candidates.filter(modality=modality)
+
+        if is_active:
+            candidates = candidates.filter(is_active=is_active)
+
+        if salary:
+            candidates = candidates.filter(salary__lte=salary)
+
+        if years_experience:
+            candidates = candidates.filter(years_experience__gte=years_experience)
+
+        if adult is not None:
+            candidates = candidates.filter(adult=adult)
+
+        if work_permission is not None:
+            candidates = candidates.filter(work_permission=work_permission)
+
+        if servsafe is not None:
+            candidates = candidates.filter(servsafe=servsafe)
+
+        # -------------------------------
+        # APPLICATIONS COUNT
+        # -------------------------------
+        if order_by in ['applications_count', '-applications_count']:
+            candidates = candidates.annotate(
+                applications_count=Count('jobapplication')
+            )
+
+        # -------------------------------
+        # ORDER BY
+        # -------------------------------
+        if order_by:
+            candidates = candidates.order_by(order_by)
+        else:
+            candidates = candidates.order_by('-created_at')
+
+        # -------------------------------
+        # SERIALIZE
+        # -------------------------------
+        serializer = CandidateAdminSerializer(
+            candidates,
+            many=True,
+            context={'request': request}
+        )
+        candidates_data = serializer.data
+
+        # =====================================================
+        # NORMALIZAR schedules → schedule (MISMA ESTRUCTURA)
+        # =====================================================
+        from collections import defaultdict
+
+        for cand in candidates_data:
+            temp_schedule = defaultdict(list)
+
+            for sched in cand.get("schedules", []):
+                if sched.get("type") == "permanent":
+                    temp_schedule["permanent"].append({
+                        "day": sched.get("day"),
+                        "time_start": sched.get("time_start"),
+                        "time_end": sched.get("time_finish"),
+                        "hired_date": sched.get("date_start"),
+                    })
+
+                elif sched.get("type") == "range":
+                    temp_schedule["range"].append({
+                        "date_start": sched.get("date_start"),
+                        "date_end": sched.get("date_end"),
+                        "time_start": sched.get("time_start"),
+                        "time_end": sched.get("time_finish"),
+                    })
+
+                elif sched.get("type") == "multiple":
+                    temp_schedule["multiple"].append({
+                        "date": sched.get("date_start"),
+                        "time_start": sched.get("time_start"),
+                        "time_end": sched.get("time_finish"),
+                    })
+
+            schedule_data = []
+            for sched_type, items in temp_schedule.items():
+                hired_date = items[0].get("hired_date") if items else None
+                schedule_data.append({
+                    "type": sched_type,
+                    "hired_date": hired_date,
+                    "dates" if sched_type == "multiple" else "days": items
+                })
+
+            cand["schedule"] = schedule_data
+
+        # =====================================================
+        # FILTRO POR SCHEDULE (MISMA LÓGICA)
+        # =====================================================
+        filtered_candidates = []
+        ranges = []
+        multiples = []
+
+        if schedule_input:
+            if isinstance(schedule_input, list):
+                schedule_str = schedule_input[0]
+            else:
+                schedule_str = schedule_input
+
+            try:
+                schedule_data = json.loads(schedule_str)
+                ranges = schedule_data.get("range", [])
+                # print("ranges",ranges)
+                multiples = schedule_data.get("multiple", [])
+                # print("multiples",multiples)
+            except (ValueError, TypeError, json.JSONDecodeError):
+                ranges = []
+                multiples = []
+
+            for cand in candidates_data:
+                match = False
+
+                # -------- RANGE --------
+                if ranges:
+                    r = ranges[0]
+                    r_date_start = parse_date(r.get("date_start"))
+                    r_date_end = parse_date(r.get("date_end"))
+                    r_hour_start = parse_time(r.get("hour_start"))
+                    r_hour_end = parse_time(r.get("hour_end"))
+
+                    for sched in cand.get("schedule", []):
+                        hired_date = parse_date(sched.get("hired_date"))
+                        if not hired_date:
+                            continue
+
+                        if not (
+                            hired_date < r_date_start or
+                            (r_date_start <= hired_date <= r_date_end)
+                        ):
+                            continue
+
+                        days = sched.get("days", sched.get("dates", []))
+                        for d in days:
+                            day_start = parse_time(d.get("time_start"))
+                            day_end = parse_time(d.get("time_end"))
+                            if hours_intersect(r_hour_start, r_hour_end, day_start, day_end):
+                                match = True
+                                break
+                        if match:
+                            break
+
+                    if match:
+                        filtered_candidates.append(cand)
+
+                # -------- MULTIPLE --------
+                elif multiples:
+                    permanent_days = []
+
+                    for sched in cand.get("schedule", []):
+                        if sched.get("type") == "permanent":
+                            permanent_days = sched.get("days", [])
+                            break
+
+                    if not permanent_days:
+                        continue
+
+                    match_found = False
+
+                    for m_item in multiples:
+                        m_date = parse_date(m_item.get("date_start"))
+                        if not m_date:
+                            continue
+
+                        m_weekday = WEEKDAY_MAP[m_date.weekday()]
+                        m_hour_start = parse_time(m_item.get("hour_start"))
+                        m_hour_end = parse_time(m_item.get("hour_end"))
+
+                        for d in permanent_days:
+                            d_hired_date = parse_date(d.get("hired_date"))
+                            if d_hired_date and m_date < d_hired_date:
+                                continue
+
+                            if d.get("day") != m_weekday:
+                                continue
+
+                            day_start = parse_time(d.get("time_start"))
+                            day_end = parse_time(d.get("time_end"))
+
+                            if hours_intersect(m_hour_start, m_hour_end, day_start, day_end):
+                                match_found = True
+                                break
+
+                        if match_found:
+                            break
+
+                    if match_found:
+                        filtered_candidates.append(cand)
+
+        else:
+            filtered_candidates = candidates_data
+
+        return Response(
+            {
+                "total": len(filtered_candidates),
+                "candidates": filtered_candidates
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {
+                "error": "Unexpected server error",
+                "details": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def candidate_admin_stats(request):
+    try:
+        data = get_candidate_admin_stats()
+        return Response(data, status=200)
+
+    except Exception as e:
+        return Response(
+            {
+                "error": "Unable to retrieve candidate admin stats",
+                "details": str(e)
+            },
+            status=500
         )

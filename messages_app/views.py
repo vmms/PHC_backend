@@ -21,6 +21,7 @@ def create_message(request):
     receiver_company_id = request.data.get("receiver_company_id")
     text = request.data.get("message")
     title = request.data.get("title")  
+    origin = request.data.get("origin")
 
     if not text:
         return Response({"error": "message is required"}, status=400)
@@ -94,6 +95,17 @@ def create_message(request):
 
         conversation_id = max_conv + 1
         conversation_title = title
+
+        if origin in ["applications", "search"]:
+            try:
+                company = Company.objects.get(account_id=request.user.id_account)
+                if origin == "applications":
+                    company.first_contact_applications += 1
+                else:
+                    company.first_contact_search += 1
+                company.save()
+            except Company.DoesNotExist:
+                return Response({"error": "Company not found"}, status=404)  
 
     # -------------------------------------------------------
     # Crear mensaje
@@ -260,3 +272,6 @@ def mark_read(request):
         return Response({"message": "read"}, status=200)
     except Message.DoesNotExist:
         return Response({"error": "Message not found or not authorized"}, status=404)
+
+
+

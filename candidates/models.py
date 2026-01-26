@@ -26,7 +26,7 @@ class PhotoProfilePath:
 @deconstructible
 class CVUPath:
     def __call__(self, instance, filename):
-        filename = f'cvu_user_{instance.id_candidate}.pdf'
+        filename = f'candidate_{instance.id_candidate}.pdf'
         full_path = os.path.join('cvu_files', filename)
 
         # Borrar CVU existente antes de guardar
@@ -68,6 +68,9 @@ class Candidate(models.Model):
 
     profile_views = models.PositiveIntegerField(default=0)
     cvu_downloads = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "candidate"

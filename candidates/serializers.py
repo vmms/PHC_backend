@@ -161,6 +161,9 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
     schedules = serializers.SerializerMethodField()
     job_applications_count = serializers.SerializerMethodField()
 
+    created_at = serializers.DateTimeField(format="%m/%d/%Y", read_only=True)
+    updated_at = serializers.DateTimeField(format="%m/%d/%Y", read_only=True)
+
     class Meta:
         model = Candidate
         fields = [
@@ -196,6 +199,8 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
             'profile_views', 
             'cvu_downloads',
             'job_applications_count',
+            'created_at',
+            'updated_at',
         ]
 
     def get_schedules(self, obj):

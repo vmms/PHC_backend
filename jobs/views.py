@@ -9,6 +9,8 @@ from companies.models import Company
 from candidates.models import Candidate
 from django.db import transaction
 from collections import defaultdict
+from jobs.services import get_jobs_admin_stats
+
 
 from skills.models import Skill
 from schedulers.models import Scheduler
@@ -367,3 +369,18 @@ def activate_job(request):
         {'message': 'Job activated successfully'},
         status=status.HTTP_200_OK
     )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_jobs_stats(request):
+    """
+    Retorna estadísticas de jobs para admin
+    """
+    try:
+        stats = get_jobs_admin_stats()
+        return Response(stats, status=200)
+    except Exception as e:
+        return Response(
+            {"error": "Unexpected server error", "details": str(e)},
+            status=500
+        )

@@ -40,6 +40,14 @@ class Company(models.Model):
     link = models.CharField(max_length=100)
     logo = models.ImageField(upload_to=CompanyLogoPath(), null=True, blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    cvu_downloads = models.IntegerField(default=0)
+    profile_views = models.IntegerField(default=0)
+    first_contact_applications = models.IntegerField(default=0)
+    first_contact_search = models.IntegerField(default=0)
+    subscription = models.CharField(max_length=50, null=True, blank=True)
+
     class Meta:
         db_table = "company"
         managed = False
