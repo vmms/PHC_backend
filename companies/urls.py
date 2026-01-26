@@ -16,4 +16,5 @@ urlpatterns = [
     path('company_admin_stats/', views.company_admin_stats, name='company_admin_stats'),
     path('admin_search_companies/', views.admin_search_companies, name='admin_search_companies'),
     path('company_admin_detail/', views.company_admin_detail, name='company_admin_detail'),
+    path('toggle_company_active/', views.toggle_company_active, name='toggle_company_active'),
 ]

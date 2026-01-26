@@ -971,3 +971,40 @@ def company_admin_detail(request):
 
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def toggle_company_active(request):
+    id_company = request.data.get('id_company')
+
+    if not id_company:
+        return Response(
+            {"error": "id_company is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        company = Company.objects.get(id_company=id_company)
+
+        # toggle 0 ↔ 1
+        company.is_active = 0 if company.is_active == 1 else 1
+        company.save(update_fields=['is_active'])
+
+        return Response(
+            {
+                "success": True,
+                "id_company": company.id_company,
+                "is_active": company.is_active
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Company.DoesNotExist:
+        return Response(
+            {"error": "Company not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": "Server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
