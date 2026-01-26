@@ -14,4 +14,5 @@ urlpatterns = [
     path('get_candidate_contact_info/', views.get_candidate_contact_info, name='get_candidate_contact_info'),
     path('search_candidates/', views.search_candidates, name='search_candidates'),
     path('company_admin_stats/', views.company_admin_stats, name='company_admin_stats'),
+    path('admin_search_companies/', views.admin_search_companies, name='admin_search_companies'),
 ]

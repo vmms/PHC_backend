@@ -47,6 +47,7 @@ class Company(models.Model):
     first_contact_applications = models.IntegerField(default=0)
     first_contact_search = models.IntegerField(default=0)
     subscription = models.CharField(max_length=50, null=True, blank=True)
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         db_table = "company"

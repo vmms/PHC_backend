@@ -886,3 +886,57 @@ def company_admin_stats(request):
             status=500
         )
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_search_companies(request):
+    data = request.data
+
+    companies = Company.objects.select_related(
+        'address',
+        'account'
+    )
+
+    # -----------------------
+    # FILTROS (opcionales)
+    # -----------------------
+    name = data.get('name')
+    city = data.get('city')
+    subscription = data.get('subscription')
+    type_business = data.get('type_business')
+    is_active = data.get('is_active')
+    order_by = data.get('order_by')
+
+    if name:
+        companies = companies.filter(name__icontains=name)
+
+    if city:
+        companies = companies.filter(address__city__icontains=city)
+
+    if subscription:
+        companies = companies.filter(account__subscription=subscription)
+
+    if type_business:
+        companies = companies.filter(type_business=type_business)
+
+    if is_active is not None:
+        companies = companies.filter(is_active=is_active)
+
+    # -----------------------
+    # ORDEN
+    # -----------------------
+    if order_by:
+        companies = companies.order_by(order_by)
+    else:
+        companies = companies.order_by('-created_at')
+
+    # -----------------------
+    # RESPONSE
+    # -----------------------
+    serializer = CompanyAdminSerializer(companies, many=True)
+
+    return Response({
+        "total": companies.count(),
+        "companies": serializer.data
+    })
+

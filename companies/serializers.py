@@ -90,6 +90,7 @@ class CompanyAdminSerializer(serializers.ModelSerializer):
             'cvu_downloads',
             'preferred_contact',
             'subscription',
+            'is_active',
         ]
     
     def get_total_jobs(self, obj):
