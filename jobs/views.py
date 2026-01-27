@@ -149,6 +149,14 @@ def create_job(request):
     if not allowed:
         return Response({'message': reason}, status=status.HTTP_403_FORBIDDEN)
 
+    if company.is_active:
+        return Response(
+            {
+                "message": "Your company profile is inactive."
+            },
+            status=status.HTTP_403_FORBIDDEN
+        )
+
     data = request.data.copy()
     data.pop('company', None)
     data.pop('company_id', None)

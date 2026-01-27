@@ -1,6 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 from django.db.models import Q, Max
 
 from .models import Message
@@ -97,6 +98,7 @@ def create_message(request):
         conversation_title = title
 
         if origin in ["applications", "search"]:
+            print("First contact")
             try:
                 company = Company.objects.get(account_id=request.user.id_account)
                 if origin == "applications":
@@ -106,6 +108,8 @@ def create_message(request):
                 company.save()
             except Company.DoesNotExist:
                 return Response({"error": "Company not found"}, status=404)  
+        else:
+            pass
 
     # -------------------------------------------------------
     # Crear mensaje

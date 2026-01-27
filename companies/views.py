@@ -23,6 +23,7 @@ from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime, time
 from django.utils import timezone
+from django.db.models import Max
 import json
 
 WEEKDAY_MAP = {
@@ -142,19 +143,99 @@ def format_date(date):
         return None
     return date.strftime("%m-%d-%Y")
 
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def list_my_job_applications(request):
+#     try:
+#         company = Company.objects.get(account=request.user)
+        
+#         # 🔹 Filtros recibidos (pueden venir o no)
+#         title = request.data.get("title")
+#         first_name = request.data.get("first_name")
+#         last_name = request.data.get("last_name")
+
+#         # 🔹 Jobs de la company
+#         jobs = Job.objects.filter(company=company)
+
+#         # 🔹 Filtro por título del job
+#         if title:
+#             jobs = jobs.filter(title__icontains=title)
+
+#         jobs_data = []
+
+#         for job in jobs:
+#             applications = JobApplication.objects.filter(id_jobs=job)
+
+#             # 🔹 Filtros por candidato
+#             if first_name:
+#                 applications = applications.filter(
+#                     id_candidate__first_name__icontains=first_name
+#                 )
+
+#             if last_name:
+#                 applications = applications.filter(
+#                     id_candidate__last_name__icontains=last_name
+#                 )
+            
+#             applications = applications.order_by('-updated_at')
+#             print(applications)
+            
+#             applications_data = []
+#             for app in applications:
+#                 applications_data.append({
+#                     "id_job_application": app.id_job_application,
+#                     "id_jobs": app.id_jobs.id_jobs,
+#                     "id_candidate": app.id_candidate.id_candidate,
+#                     "candidate_name": f"{app.id_candidate.first_name} {app.id_candidate.last_name}",
+#                     "status": app.status,
+#                     "created_at": format_date(app.created_at),
+#                     "updated_at": format_date(app.updated_at),
+#                 })
+            
+#             applications_data.sort(
+#                 key=lambda x: x["updated_at"],
+#                 reverse=True
+#             )
+
+#             # 🔹 Opcional: no regresar jobs sin aplicaciones
+#             if applications_data:
+#                 jobs_data.append({
+#                     "id_jobs": job.id_jobs,
+#                     "title": job.title,
+#                     "applications": applications_data
+#                 })
+
+#         return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
+
+#     except Company.DoesNotExist:
+#         return Response(
+#             {"message": "No company associated with this user"},
+#             status=status.HTTP_404_NOT_FOUND
+#         )
+
+#     except Exception as e:
+#         return Response(
+#             {"error": "Unexpected error", "details": str(e)},
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_my_job_applications(request):
     try:
         company = Company.objects.get(account=request.user)
-        
-        # 🔹 Filtros recibidos (pueden venir o no)
-        title = request.data.get("title")
-        first_name = request.data.get("first_name")
-        last_name = request.data.get("last_name")
 
-        # 🔹 Jobs de la company
-        jobs = Job.objects.filter(company=company)
+        # 🔹 Filtros (GET → query_params)
+        title = request.query_params.get("title")
+        first_name = request.query_params.get("first_name")
+        last_name = request.query_params.get("last_name")
+
+        # 🔥 JOBS ordenados por la última application
+        jobs = Job.objects.filter(
+            company=company
+        ).annotate(
+            last_application=Max('jobapplication__updated_at')
+        ).order_by('-last_application')
 
         # 🔹 Filtro por título del job
         if title:
@@ -163,7 +244,10 @@ def list_my_job_applications(request):
         jobs_data = []
 
         for job in jobs:
-            applications = JobApplication.objects.filter(id_jobs=job)
+            applications = JobApplication.objects.filter(
+                id_jobs=job,
+                updated_at__isnull=False
+            )
 
             # 🔹 Filtros por candidato
             if first_name:
@@ -175,6 +259,9 @@ def list_my_job_applications(request):
                 applications = applications.filter(
                     id_candidate__last_name__icontains=last_name
                 )
+
+            # 🔥 ORDEN FINAL de applications
+            applications = applications.order_by('-updated_at', '-id_job_application')
 
             applications_data = []
             for app in applications:
@@ -188,7 +275,7 @@ def list_my_job_applications(request):
                     "updated_at": format_date(app.updated_at),
                 })
 
-            # 🔹 Opcional: no regresar jobs sin aplicaciones
+            # 🔹 No regresar jobs sin applications
             if applications_data:
                 jobs_data.append({
                     "id_jobs": job.id_jobs,
@@ -200,14 +287,8 @@ def list_my_job_applications(request):
 
     except Company.DoesNotExist:
         return Response(
-            {"message": "No company associated with this user"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    except Exception as e:
-        return Response(
-            {"error": "Unexpected error", "details": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"message": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
         )
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -528,6 +609,12 @@ def search_candidates(request):
     except Company.DoesNotExist:
         return Response(
             {"message": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if company.subscription == 'basic':
+        return Response(
+            {"message": "Your subscription does not allow candidate search"},
             status=status.HTTP_403_FORBIDDEN
         )
 
@@ -891,7 +978,7 @@ def company_admin_stats(request):
 @permission_classes([IsAuthenticated])
 def admin_search_companies(request):
     data = request.data
-
+    
     companies = Company.objects.select_related(
         'address',
         'account'
@@ -914,7 +1001,7 @@ def admin_search_companies(request):
         companies = companies.filter(address__city__icontains=city)
 
     if subscription:
-        companies = companies.filter(account__subscription=subscription)
+        companies = companies.filter(subscription=subscription)
 
     if type_business:
         companies = companies.filter(type_business=type_business)
@@ -1013,6 +1100,7 @@ def toggle_company_active(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_company_subscription(request):
+
     id_company = request.data.get('id_company')
     new_subscription = request.data.get('subscription')
 
