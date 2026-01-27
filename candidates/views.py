@@ -280,6 +280,13 @@ def apply_to_job(request):
     # Candidate ligado a esa cuenta
     try:
         candidate = Candidate.objects.get(account=account)
+        if not candidate.is_active:
+            return Response(
+                {
+                    "message": "You cannot apply for a job if your account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
     except Candidate.DoesNotExist:
         return Response(
             {'message': 'No candidate associated with this user'},
@@ -370,6 +377,24 @@ def haversine(lat1, lon1, lat2, lon2):
 @permission_classes([IsAuthenticated])
 def list_job(request):
     data = request.data
+
+    account = request.user
+
+    # Candidate ligado a esa cuenta
+    try:
+        candidate = Candidate.objects.get(account=account)
+        if not candidate.is_active:
+            return Response(
+                {
+                    "message": "You cannot apply for a job if your account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+    except Candidate.DoesNotExist:
+        return Response(
+            {'message': 'No candidate associated with this user'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     # Si el JSON está vacío o todos los filtros son None/'none', devolver vacíos
     if not data or all(
@@ -565,6 +590,24 @@ def my_applications(request):
     id_candidate = request.data.get("id_candidate")
     title = request.data.get("title")
     company = request.data.get("company")
+
+    account = request.user
+
+    # Candidate ligado a esa cuenta
+    try:
+        candidate = Candidate.objects.get(account=account)
+        if not candidate.is_active:
+            return Response(
+                {
+                    "message": "You cannot apply for a job if your account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+    except Candidate.DoesNotExist:
+        return Response(
+            {'message': 'No candidate associated with this user'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     if not id_candidate:
         return Response({"message": "id_candidate is required"}, status=400)

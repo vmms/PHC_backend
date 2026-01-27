@@ -223,21 +223,33 @@ def format_date(date):
 @permission_classes([IsAuthenticated])
 def list_my_job_applications(request):
     try:
-        company = Company.objects.get(account=request.user)
+        company = Company.objects.get(account_id=request.user.id_account)
 
-        # 🔹 Filtros (GET → query_params)
+        if not company.is_active:
+            return Response(
+                {
+                    "error": ("You cannot see the candidates who have applied because your account is inactive.")
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # -----------------------------------
+        # 3. Filtros (GET → query_params)
+        # -----------------------------------
         title = request.query_params.get("title")
         first_name = request.query_params.get("first_name")
         last_name = request.query_params.get("last_name")
 
-        # 🔥 JOBS ordenados por la última application
+        # -----------------------------------
+        # 4. Jobs de la company (solo activos)
+        # -----------------------------------
         jobs = Job.objects.filter(
-            company=company
+            company_id=company.id_company,
+            is_active=True
         ).annotate(
             last_application=Max('jobapplication__updated_at')
         ).order_by('-last_application')
 
-        # 🔹 Filtro por título del job
         if title:
             jobs = jobs.filter(title__icontains=title)
 
@@ -246,7 +258,8 @@ def list_my_job_applications(request):
         for job in jobs:
             applications = JobApplication.objects.filter(
                 id_jobs=job,
-                updated_at__isnull=False
+                updated_at__isnull=False,
+                id_candidate__is_active=True
             )
 
             # 🔹 Filtros por candidato
@@ -260,16 +273,21 @@ def list_my_job_applications(request):
                     id_candidate__last_name__icontains=last_name
                 )
 
-            # 🔥 ORDEN FINAL de applications
-            applications = applications.order_by('-updated_at', '-id_job_application')
+            applications = applications.order_by(
+                '-updated_at',
+                '-id_job_application'
+            )
 
             applications_data = []
             for app in applications:
                 applications_data.append({
                     "id_job_application": app.id_job_application,
-                    "id_jobs": app.id_jobs.id_jobs,
+                    "id_jobs": job.id_jobs,
                     "id_candidate": app.id_candidate.id_candidate,
-                    "candidate_name": f"{app.id_candidate.first_name} {app.id_candidate.last_name}",
+                    "candidate_name": (
+                        f"{app.id_candidate.first_name} "
+                        f"{app.id_candidate.last_name}"
+                    ),
                     "status": app.status,
                     "created_at": format_date(app.created_at),
                     "updated_at": format_date(app.updated_at),
@@ -283,13 +301,17 @@ def list_my_job_applications(request):
                     "applications": applications_data
                 })
 
-        return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
+        return Response(
+            {"jobs": jobs_data},
+            status=status.HTTP_200_OK
+        )
 
     except Company.DoesNotExist:
         return Response(
-            {"message": "User has no associated company"},
+            {"error": "User has no associated company"},
             status=status.HTTP_403_FORBIDDEN
         )
+
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 3958.8  # millas
@@ -309,6 +331,13 @@ def list_my_jobs(request):
     # -----------------------------------
     try:
         company = Company.objects.get(account_id=request.user.id_account)
+        if not company.is_active:
+            return Response(
+                {
+                    "message": "You cannot see your published work if your account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
     except Company.DoesNotExist:
         return Response(
             {"message": "User has no associated company"},
@@ -606,6 +635,13 @@ def search_candidates(request):
     # -----------------------------------
     try:
         company = Company.objects.get(account_id=request.user.id_account)
+        if not company.is_active:
+            return Response(
+                {
+                    "message": "You cannot perform a search if your account is inactive."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
     except Company.DoesNotExist:
         return Response(
             {"message": "User has no associated company"},

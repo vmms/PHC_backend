@@ -142,6 +142,13 @@ def get_job(request):
 @permission_classes([IsAuthenticated])
 def create_job(request):
     company = _company_for_user(request.user)
+
+    if not company.is_active:
+                return Response(
+                    {"error": "You cannot create a new job because your account is inactive."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
     if not company:
         return Response({'message': 'No company associated with this user'}, status=status.HTTP_404_NOT_FOUND)
 

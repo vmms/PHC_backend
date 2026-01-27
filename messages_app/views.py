@@ -61,10 +61,16 @@ def create_message(request):
         if not receiver_candidate_id:
             return Response({"error": "Must send receiver_candidate_id"}, status=400)
         try:
+            company = Company.objects.get(account_id=request.user.id_account)
             candidate = Candidate.objects.get(id_candidate=receiver_candidate_id)
             # -------------------------------------------------------
             # VALIDAR SI EL RECEPTOR (CANDIDATO) ESTÁ ACTIVO
             # -------------------------------------------------------
+            if not company.is_active:
+                return Response(
+                    {"error": "You cannot send messages because your account is inactive."},
+                    status=status.HTTP_403_FORBIDDEN
+                ) 
             if not candidate.is_active:
                 return Response(
                     {"error": "Cannot send messages to an inactive candidate"},
