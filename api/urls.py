@@ -10,4 +10,5 @@ urlpatterns = [
     path('jobs/', include('jobs.urls')),
     path('messages_app/', include('messages_app.urls')),
     path('jobApplication/', include('jobApplication.urls')),
+    path('payments/', include('payments.urls')),
 ]

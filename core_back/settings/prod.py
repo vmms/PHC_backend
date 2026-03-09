@@ -4,10 +4,10 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASSWORD"),
-        'HOST': os.environ.get("DB_HOST"),
+        'NAME': 'mysql',
+        'USER': 'admin',
+        'PASSWORD': 'root1234',
+        'HOST': 'database-phc.cbwmicsw2dg1.us-west-1.rds.amazonaws.com',
         'PORT': '3306',
     }
 }

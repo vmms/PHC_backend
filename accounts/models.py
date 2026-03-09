@@ -11,6 +11,8 @@ class Account(models.Model):
     google_id = models.CharField(max_length=255, null=True, blank=True)
     facebook_id = models.CharField(max_length=255, null=True, blank=True)
 
+    subscription_expires_at = models.DateTimeField(null=True, blank=True)
+
     observations_admin = models.TextField(null=True, blank=True)  
 
     class Meta:
@@ -18,7 +20,7 @@ class Account(models.Model):
         db_table = 'account'  # nombre exacto de tu tabla en MySQL
 
     def __str__(self):
-        return self.nombre
+        return self.user
 
     @property
     def is_authenticated(self):

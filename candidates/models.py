@@ -9,32 +9,45 @@ from django.utils.deconstruct import deconstructible
 from django.conf import settings
 import os
 
+# @deconstructible
+# class PhotoProfilePath:
+#     def __call__(self, instance, filename):
+#         ext = filename.split('.')[-1]
+#         filename = f'photo_user_{instance.id_candidate}.{ext}'
+#         full_path = os.path.join('photos_profiles', filename)
+        
+#         # Borrar archivo existente antes de guardar
+#         absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
+#         if os.path.exists(absolute_path):
+#             os.remove(absolute_path)
+        
+#         return full_path
+
 @deconstructible
 class PhotoProfilePath:
     def __call__(self, instance, filename):
         ext = filename.split('.')[-1]
         filename = f'photo_user_{instance.id_candidate}.{ext}'
-        full_path = os.path.join('photos_profiles', filename)
-        
-        # Borrar archivo existente antes de guardar
-        absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
-        if os.path.exists(absolute_path):
-            os.remove(absolute_path)
-        
-        return full_path
+        return os.path.join('media/candidates/photos', filename)
+
+# @deconstructible
+# class CVUPath:
+#     def __call__(self, instance, filename):
+#         filename = f'candidate_{instance.id_candidate}.pdf'
+#         full_path = os.path.join('cvu_files', filename)
+
+#         # Borrar CVU existente antes de guardar
+#         absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
+#         if os.path.exists(absolute_path):
+#             os.remove(absolute_path)
+
+#         return full_path
 
 @deconstructible
 class CVUPath:
     def __call__(self, instance, filename):
         filename = f'candidate_{instance.id_candidate}.pdf'
-        full_path = os.path.join('cvu_files', filename)
-
-        # Borrar CVU existente antes de guardar
-        absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
-        if os.path.exists(absolute_path):
-            os.remove(absolute_path)
-
-        return full_path
+        return os.path.join('media/candidates/cvu', filename)
 
 class Candidate(models.Model):
     id_candidate = models.AutoField(primary_key=True)

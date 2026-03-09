@@ -305,78 +305,106 @@ def deactivate_account(request):
 @api_view(['POST'])
 @permission_classes([])
 def token_login(request):
-    print(request.data)
     username = request.data.get('user')
     password = request.data.get('password')
-    type_account = request.data.get('type')  # 'company' | 'candidate'
+    type_account = request.data.get('type')  # 'company' | 'candidate' | 'admin' | 'candidate-google' | 'company-google'
 
-    if not username or not password or not type_account:
+    if not username or not type_account:
         return Response(
-            {
-                "code": 0,
-                "message": "Username, password, and account type are required."
-            },
+            {"code": 0, "message": "Username and account type are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    try:
-        account = Account.objects.get(user=username)
-    except Account.DoesNotExist:
-        return Response(
-            {
-                "code": 0,
-                "message": "User not found."
-            },
-            status=status.HTTP_404_NOT_FOUND
-        )
+    # Detectamos si es login Google
+    is_google_account = type_account.endswith('-google')
+    base_type = type_account.replace('-google', '') if is_google_account else type_account
 
-    if account.password != password:
-        return Response(
-            {
-                "code": 0,
-                "message": "Invalid password."
-            },
-            status=status.HTTP_401_UNAUTHORIZED
-        )
+    account = None
 
-    # -------------------------------
-    # VALIDATE ACCOUNT TYPE
-    # -------------------------------
-    
-    # ADMIN
-    if type_account == 'admin':
-        if account.subscription != 'admin':
-            return Response(
-                {
-                    "code": 0,
-                    "message": "This account is not an admin account."
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-    # COMPANY / CANDIDATE
+    if is_google_account:
+        # -------------------------------
+        # GOOGLE LOGIN FLOW
+        # -------------------------------
+        account = Account.objects.filter(user=username, subscription=base_type).first()
+        if not account:
+            # Crear cuenta nueva automáticamente
+            serializer = AccountSerializer(data={
+                "user": username,
+                "password": "social-login-placeholder",  # password dummy
+                "subscription": base_type,
+                "email": username,
+                "google_id": request.data.get("google_id") or username,
+                "status": 1
+            })
+            if serializer.is_valid():
+                account = serializer.save()
+                # Crear registro interno según tipo
+                if base_type == "candidate":
+                    create_candidate_internal(id_account=account.id_account, email=account.email)
+                elif base_type == "company":
+                    from companies.services import create_company_internal
+                    create_company_internal(id_account=account.id_account, email=account.email)
+                # Enviar correo de bienvenida
+                send_mail(
+                    subject="Welcome to Professional Hospitality Connections",
+                    message=(
+                        f"Welcome to Professional Hospitality Connections!\n\n"
+                        f"Your {base_type.capitalize()} Google account has been successfully linked.\n\n"
+                        "You can now log in and start exploring the platform.\n\n"
+                        "Best regards,\n"
+                        "Professional Hospitality Connections"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[account.email],
+                    fail_silently=False  
+                )
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else:
-        is_company = Company.objects.filter(account=account).exists()
-        is_candidate = Candidate.objects.filter(account=account).exists()
-
-        if type_account == 'company' and not is_company:
+        # -------------------------------
+        # NORMAL LOGIN FLOW
+        # -------------------------------
+        if not password:
             return Response(
-                {
-                    "code": 0,
-                    "message": "This account is not a company account. Please log in as a candidate."
-                },
-                status=status.HTTP_403_FORBIDDEN
+                {"code": 0, "message": "Password is required for this login type."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            account = Account.objects.get(user=username)
+        except Account.DoesNotExist:
+            return Response(
+                {"code": 0, "message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if account.password != password:
+            return Response(
+                {"code": 0, "message": "Invalid password."},
+                status=status.HTTP_401_UNAUTHORIZED
             )
 
-        if type_account == 'candidate' and not is_candidate:
-            return Response(
-                {
-                    "code": 0,
-                    "message": "This account is not a candidate account. Please log in as a company."
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # -------------------------------
+        # VALIDATE ACCOUNT TYPE
+        # -------------------------------
+        if base_type == 'admin':
+            if account.subscription != 'admin':
+                return Response(
+                    {"code": 0, "message": "This account is not an admin account."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            is_company = Company.objects.filter(account=account).exists()
+            is_candidate = Candidate.objects.filter(account=account).exists()
 
+            if base_type == 'company' and not is_company:
+                return Response(
+                    {"code": 0, "message": "This account is not a company account. Please log in as a candidate."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            if base_type == 'candidate' and not is_candidate:
+                return Response(
+                    {"code": 0, "message": "This account is not a candidate account. Please log in as a company."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
     # -------------------------------
     # CREATE TOKENS

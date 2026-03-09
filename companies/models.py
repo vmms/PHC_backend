@@ -6,21 +6,28 @@ from django.utils.deconstruct import deconstructible
 from django.conf import settings
 import os
 
+# @deconstructible
+# class CompanyLogoPath:
+#     def __call__(self, instance, filename):
+#         # Obtener extensión del archivo original
+#         ext = filename.split('.')[-1]
+#         # Nombre fijo por empresa
+#         filename = f'logo_company_{instance.id_company}.{ext}'
+#         full_path = os.path.join('company_logos', filename)
+
+#         # Borrar archivo existente si ya existe
+#         absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
+#         if os.path.exists(absolute_path):
+#             os.remove(absolute_path)
+
+#         return full_path
+
 @deconstructible
 class CompanyLogoPath:
     def __call__(self, instance, filename):
-        # Obtener extensión del archivo original
         ext = filename.split('.')[-1]
-        # Nombre fijo por empresa
         filename = f'logo_company_{instance.id_company}.{ext}'
-        full_path = os.path.join('company_logos', filename)
-
-        # Borrar archivo existente si ya existe
-        absolute_path = os.path.join(settings.MEDIA_ROOT, full_path)
-        if os.path.exists(absolute_path):
-            os.remove(absolute_path)
-
-        return full_path
+        return os.path.join('media/companies/logos', filename)
 
 class Company(models.Model):
     id_company = models.AutoField(primary_key=True)

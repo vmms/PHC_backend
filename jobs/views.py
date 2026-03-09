@@ -7,6 +7,7 @@ from .models import Job, SkillsHasJobs, ScheduleHasJobs, Application
 from .serializers import JobSerializer
 from companies.models import Company
 from candidates.models import Candidate
+from accounts.models import Account
 from django.db import transaction
 from collections import defaultdict
 from jobs.services import get_jobs_admin_stats
@@ -15,6 +16,7 @@ from jobs.services import get_jobs_admin_stats
 from skills.models import Skill
 from schedulers.models import Scheduler
 from geopy.geocoders import Nominatim
+from django.utils import timezone
 
 import time
 
@@ -142,21 +144,29 @@ def get_job(request):
 @permission_classes([IsAuthenticated])
 def create_job(request):
     company = _company_for_user(request.user)
+    account = Account.objects.get(user=request.user)
+
+    subscription_expired = account.subscription_expires_at
+    print(subscription_expired)
+
+    if subscription_expired and subscription_expired < timezone.now():
+        return Response({
+            "error": "Your subscription has expired. Please renew your payment to continue."
+        }, status=status.HTTP_403_FORBIDDEN)
+    # if not company.is_active:
+    #             return Response(
+    #                 {"error": "You cannot create a new job because your account is inactive."},
+    #                 status=status.HTTP_403_FORBIDDEN
+    #             )
+
+    # if not company:
+    #     return Response({'message': 'No company associated with this user'}, status=status.HTTP_404_NOT_FOUND)
+
+    # allowed, reason = _company_allowed(request.user)
+    # if not allowed:
+    #     return Response({'message': reason}, status=status.HTTP_403_FORBIDDEN)
 
     if not company.is_active:
-                return Response(
-                    {"error": "You cannot create a new job because your account is inactive."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-    if not company:
-        return Response({'message': 'No company associated with this user'}, status=status.HTTP_404_NOT_FOUND)
-
-    allowed, reason = _company_allowed(request.user)
-    if not allowed:
-        return Response({'message': reason}, status=status.HTTP_403_FORBIDDEN)
-
-    if company.is_active:
         return Response(
             {
                 "message": "Your company profile is inactive."

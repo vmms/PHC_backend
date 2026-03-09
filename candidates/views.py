@@ -711,7 +711,7 @@ def load_cvu(request):
     )
 
     return Response(
-        {"message": "Your CV file has been updated"},
+        {"message": "Your resum file has been updated"},
         status=status.HTTP_200_OK
     )
 

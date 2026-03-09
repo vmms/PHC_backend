@@ -28,14 +28,15 @@ DEBUG = False    # cada ambiente lo cambia
 
 ALLOWED_HOSTS = [
     '127.0.0.1',
-    'localhost',
-    '96a967b472d0.ngrok-free.app'
+    #'localhost',
+    #'96a967b472d0.ngrok-free.app'
+    '*'
     ]
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://96a967b472d0.ngrok-free.app ", 
-    "https://ruthe-unretributive-superscientifically.ngrok-free.dev",
+    #"https://96a967b472d0.ngrok-free.app ", 
+    #"https://ruthe-unretributive-superscientifically.ngrok-free.dev",
     ]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -183,3 +184,15 @@ EMAIL_HOST_USER = 'info@professionalhospitalityconnections.com'
 EMAIL_HOST_PASSWORD = 'gqfmwwinvomrdwgi'
 
 DEFAULT_FROM_EMAIL = 'Professional Hospitality Connections <info@professionalhospitalityconnections.com>'
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'phc',
+        'USER': 'adminPHC',
+        'PASSWORD': 'PhC2026Ndr3ea',
+        'HOST': 'phc-db.cbwmicsw2dg1.us-west-1.rds.amazonaws.com',
+        'PORT': '3306',
+    }
+}
