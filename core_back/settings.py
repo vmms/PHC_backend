@@ -197,9 +197,9 @@ DATABASES = {
 
 
 ELAVON_CONFIG = {
-    "merchant_id": os.environ.get("ELAVON_MERCHANT_ID", '2735183'), 
-    "user_id": os.environ.get("ELAVON_USER_ID", 'admin'),
-    "pin": os.environ.get("ELAVON_PIN", 'A1LURGFRIV5YYDE2S60LZ96SVRNN8HDZ8SB8RU3YA3N7XI37L2EZVPI5S8HZXTQQ'),
+    "merchant_id": os.environ.get("ELAVON_MERCHANT_ID"), 
+    "user_id": os.environ.get("ELAVON_USER_ID"),
+    "pin": os.environ.get("ELAVON_PIN"),
     "is_demo": os.environ.get("ELAVON_DEMO", "True") == "True",
 }
 
@@ -222,5 +222,21 @@ STORAGES = {
     },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+import sys
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "stream": sys.stdout,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",  # o DEBUG si quieres todo
     },
 }

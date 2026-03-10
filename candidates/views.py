@@ -29,13 +29,14 @@ from django.utils import timezone
 import os
 import time
 import json
+import logging
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
 
 from candidates.services import parse_date, parse_time, hours_intersect
 
-
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -341,16 +342,21 @@ def apply_to_job(request):
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
 def upload_photo(request):
+    logger.info("Solicitud recibida en upload_photo")
+    logger.debug(f"Contenido del request: {request.data}")
     id_candidate = request.data.get('id_candidate')
     if not id_candidate:
+        print('error: id_candidate is required')
         return Response({'error': 'id_candidate is required'}, status=400)
 
     try:
         candidate = Candidate.objects.get(id_candidate=id_candidate)
     except Candidate.DoesNotExist:
+        print('error: Candidate not found')
         return Response({'error': 'Candidate not found'}, status=404)
 
     if 'photo' not in request.FILES:
+        print('error: No photo file provided')
         return Response({'error': 'No photo file provided'}, status=400)
 
     # Guardar la foto usando .save() para que se sobrescriba
@@ -359,7 +365,7 @@ def upload_photo(request):
         request.FILES['photo'], 
         save=True
     )
-
+    print("message: Your profile photo has been updated successfully")
     return Response(
         {"message": "Your profile photo has been updated successfully"},
         status=200
@@ -426,8 +432,8 @@ def list_job(request):
         jobs = jobs.filter(title__icontains=title)
     if employment_type and isinstance(employment_type, str) and employment_type.lower() != 'none':
         jobs = jobs.filter(employment_type__iexact=employment_type)
-    if job_type and isinstance(employment_type, str) and job_type.lower() != 'none':
-        jobs = jobs.filter(employment_type__iexact=job_type)
+    if job_type and isinstance(job_type, str) and job_type.lower() != 'none':
+        jobs = jobs.filter(job_type__iexact=job_type)
     if modality and isinstance(modality, str) and modality.lower() != 'none':
         jobs = jobs.filter(modality__iexact=modality)
     if qualifications and isinstance(qualifications, str) and qualifications.lower() != 'none':
