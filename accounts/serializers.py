@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Account
 from django.contrib.auth.hashers import check_password
+from django.utils import timezone
 
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,7 +12,8 @@ class AccountSerializer(serializers.ModelSerializer):
             'user',
             'email',
             'password',
-            'subscription'
+            'subscription',
+            'subscription_expires_at',
         ]
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
@@ -70,6 +72,9 @@ class ErrorResponseSerializer(serializers.Serializer):
         ref_name = "ErrorResponse"
 
 class AccountAdminSerializer(serializers.ModelSerializer):
+    subscription_expires_at = serializers.DateTimeField(format="%d/%m/%Y")
+    days_to_expire = serializers.SerializerMethodField()
+
     class Meta:
         model = Account
         fields = [
@@ -78,5 +83,16 @@ class AccountAdminSerializer(serializers.ModelSerializer):
             'user',
             'email',
             'subscription',
-            'observations_admin'
+            'subscription_expires_at',
+            'observations_admin',
+            'days_to_expire',
         ]
+
+    def get_days_to_expire(self, obj):
+        if not obj.subscription_expires_at:
+            return None
+
+        now = timezone.now()
+        delta = obj.subscription_expires_at - now
+
+        return max(delta.days, 0)  # evita negativos

@@ -778,3 +778,4 @@ def observations_admin(request):
             {"error": "Unexpected server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+

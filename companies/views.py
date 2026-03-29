@@ -22,6 +22,7 @@ from companies.services import get_company_admin_stats
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime, time
+from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.db.models import Max
 import json
@@ -142,82 +143,6 @@ def format_date(date):
     if not date:
         return None
     return date.strftime("%m-%d-%Y")
-
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def list_my_job_applications(request):
-#     try:
-#         company = Company.objects.get(account=request.user)
-        
-#         # 🔹 Filtros recibidos (pueden venir o no)
-#         title = request.data.get("title")
-#         first_name = request.data.get("first_name")
-#         last_name = request.data.get("last_name")
-
-#         # 🔹 Jobs de la company
-#         jobs = Job.objects.filter(company=company)
-
-#         # 🔹 Filtro por título del job
-#         if title:
-#             jobs = jobs.filter(title__icontains=title)
-
-#         jobs_data = []
-
-#         for job in jobs:
-#             applications = JobApplication.objects.filter(id_jobs=job)
-
-#             # 🔹 Filtros por candidato
-#             if first_name:
-#                 applications = applications.filter(
-#                     id_candidate__first_name__icontains=first_name
-#                 )
-
-#             if last_name:
-#                 applications = applications.filter(
-#                     id_candidate__last_name__icontains=last_name
-#                 )
-            
-#             applications = applications.order_by('-updated_at')
-#             print(applications)
-            
-#             applications_data = []
-#             for app in applications:
-#                 applications_data.append({
-#                     "id_job_application": app.id_job_application,
-#                     "id_jobs": app.id_jobs.id_jobs,
-#                     "id_candidate": app.id_candidate.id_candidate,
-#                     "candidate_name": f"{app.id_candidate.first_name} {app.id_candidate.last_name}",
-#                     "status": app.status,
-#                     "created_at": format_date(app.created_at),
-#                     "updated_at": format_date(app.updated_at),
-#                 })
-            
-#             applications_data.sort(
-#                 key=lambda x: x["updated_at"],
-#                 reverse=True
-#             )
-
-#             # 🔹 Opcional: no regresar jobs sin aplicaciones
-#             if applications_data:
-#                 jobs_data.append({
-#                     "id_jobs": job.id_jobs,
-#                     "title": job.title,
-#                     "applications": applications_data
-#                 })
-
-#         return Response({"jobs": jobs_data}, status=status.HTTP_200_OK)
-
-#     except Company.DoesNotExist:
-#         return Response(
-#             {"message": "No company associated with this user"},
-#             status=status.HTTP_404_NOT_FOUND
-#         )
-
-#     except Exception as e:
-#         return Response(
-#             {"error": "Unexpected error", "details": str(e)},
-#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#         )
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -1178,3 +1103,74 @@ def update_company_subscription(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def payment(request):
+    #print("data ", request.data)
+
+    amount_raw = request.data.get('amount')
+    now = timezone.now()
+
+    # Validar que venga el amount
+    if amount_raw is None:
+        return Response(
+            {"error": "amount is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        ssl_amount = float(amount_raw)
+    except ValueError:
+        return Response(
+            {"error": "Invalid amount format"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        company = Company.objects.select_related('account').get(
+            account_id=request.user.id_account
+        )
+    except Company.DoesNotExist:
+        return Response(
+            {"error": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        # 🔹 SOLO afecta Company.subscription
+        if ssl_amount == 150.00:
+            subscription_type = 'basic'
+        elif ssl_amount == 250.00:
+            subscription_type = 'premium'
+        elif ssl_amount == 0.01:
+            subscription_type = 'test'
+        else:
+            return Response(
+                {"error": "Invalid amount"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Actualizar company
+        company.subscription = subscription_type
+        company.save(update_fields=['subscription'])
+
+        # Actualizar account
+        account = company.account
+        account.subscription_expires_at = now + relativedelta(months=1)
+        account.save(update_fields=['subscription_expires_at'])
+
+        return Response(
+            {
+                "success": True,
+                "subscription": subscription_type,
+                "expires_at": account.subscription_expires_at
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

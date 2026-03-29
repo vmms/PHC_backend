@@ -18,4 +18,5 @@ urlpatterns = [
     path('company_admin_detail/', views.company_admin_detail, name='company_admin_detail'),
     path('toggle_company_active/', views.toggle_company_active, name='toggle_company_active'),
     path('update_company_subscription/', views.update_company_subscription, name='update_company_subscription'),
+    path('payment/', views.payment, name='payment'),
 ]

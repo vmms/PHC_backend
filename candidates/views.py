@@ -735,15 +735,14 @@ def download_cvu(request):
     if not candidate.cvu:
         return Response({'error': 'CVU not found'}, status=404)
 
-    file_path = candidate.cvu.path
-
-    if not os.path.exists(file_path):
+    try:
+        file = candidate.cvu.open('rb')
+    except Exception:
         return Response({'error': 'File does not exist'}, status=404)
 
     user_account = request.user
 
     if user_account.subscription == 'ADMIN':
-        # Los admins solo descargan, no cuentan
         pass
     elif user_account.subscription in ['company']:
         try:
@@ -755,16 +754,11 @@ def download_cvu(request):
                 {"error": "Company not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
-    else:
-        # Otros usuarios no deben incrementar nada
-        pass
 
     download_name = f'{candidate.first_name}_{candidate.last_name}.pdf'
 
-    response = FileResponse(
-        open(file_path, 'rb'),
-        content_type='application/pdf'
-    )
+    response = FileResponse(file, content_type='application/pdf')
+    response["Content-Disposition"] = f'attachment; filename="{download_name}"'
 
     return response
 

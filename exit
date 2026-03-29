@@ -1,0 +1,29 @@
+[33m5944005[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m)[m pagos perfil de compañia sin credenciales
+[33m30b0286[m pagos perfil de compañia
+[33m23f4571[m[33m ([m[1;31morigin/develop[m[33m, [m[1;31morigin/HEAD[m[33m)[m Version estable de candidato
+[33m10aca22[m Fotos en e3 y login con google
+[33mc10367b[m Se arreglaron bug de logica, se pusieron restricciones en todos los perfiles para usar el sistema
+[33m4c3cb67[m Se arreglaron algunos bugs en los filtros de ordenamiento cuando se listan los candidatos
+[33mdfa47c6[m Se agrego una view para cambiar la suscripcion de una compañia
+[33m2e47674[m Se agrego una view para cambiar activar o desactivar una empresa
+[33m591780e[m Se agrego una view para obtener la información completa del perfil de una empresa con su id
+[33m94c2b8f[m Se agrego la busqueda de empresas desde el admin con todos los campos y filtros
+[33mfabc05f[m Se agregaron estadisticas de trabajo, tambien contadores para las estadisticas
+[33m3150747[m Se agregaron estadisticas de los candidatos y las empresas que tiene que ver con conteos
+[33md972286[m Restriccion de permisos a los candidatos que no han sido aprobados. Servicios para activar y desactivar candidatos
+[33mf5e8ecd[m Servicios para que el admin pueda listar los candidatos y empresas con conteo.
+[33m5172cc5[m Cabios en cuentas: eliminar, recuperar pass, cambiar pass; serivicio de busqueda actualizado.
+[33m4f10ca1[m Sistema funcionando
+[33m2cbc881[m Agregaron opciones para poder subir el cvu en pdf. Las compañias ya pueden enviar mensajes y los candidatos pueden leerlos
+[33m5e5307a[m se agregaron end points para el perfil de company para el manejo de jobs
+[33mb0e3787[m Depuración de los servicios para el perfil de candidato
+[33m4eb83e6[m Modificaciones a los tipos de trabajos
+[33m8ae60c5[m Agregar documentacion de ejemplo para crear un job
+[33m47b57d3[m Se agregaron los end points de Messages
+[33m783001b[m Corrección de la documentación y errores en metodos de account y companies
+[33m9d518dd[m Se crearon los endpoints de jobs y se cambio el estilo de las documentación
+[33m047c2c0[m Se agregó una api para candidates y su documentación
+[33m5f10f4f[m Se agregó la documentación de companies
+[33m479f08a[m Se agregó la documentación inicial
+[33mfb12959[m Primera versión, contiene companies y account
+[33m7f0a3ca[m base project

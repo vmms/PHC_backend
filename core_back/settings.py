@@ -28,7 +28,7 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'    # cada ambiente lo cambia
 ALLOWED_HOSTS = [
     '127.0.0.1',
     #'localhost',
-    'ddc3-148-215-111-119.ngrok-free.app',
+    'd841-148-215-111-248.ngrok-free.app  ',
     '*',
     'test1-back-phc.us-west-1.elasticbeanstalk.com'
     ]
@@ -36,7 +36,7 @@ ALLOWED_HOSTS = [
 
 CSRF_TRUSTED_ORIGINS = [
     'https://test1-back-phc.us-west-1.elasticbeanstalk.com',
-    'https://ddc3-148-215-111-119.ngrok-free.app /',
+    'https://d841-148-215-111-248.ngrok-free.app  /',
     #"https://96a967b472d0.ngrok-free.app ", 
     #"https://ruthe-unretributive-superscientifically.ngrok-free.dev",
     ]
@@ -212,7 +212,7 @@ AWS_S3_REGION_NAME = "us-west-1"
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 AWS_S3_FILE_OVERWRITE = True
-AWS_QUERYSTRING_EXPIRE = 10
+AWS_QUERYSTRING_EXPIRE = 3600
 
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 
@@ -240,3 +240,6 @@ LOGGING = {
         "level": "INFO",  # o DEBUG si quieres todo
     },
 }
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000
+FILE_UPLOAD_MAX_MEMORY_SIZE = 524288000
