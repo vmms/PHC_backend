@@ -9,6 +9,7 @@ from .serializers import MessageSerializer
 from candidates.models import Candidate
 from companies.models import Company
 from accounts.models import Account
+from django.utils import timezone
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -142,6 +143,35 @@ def list_chats(request):
 
     title = data.get("title")
     company_name = data.get("company")
+
+    if user_account.subscription != 'candidate':
+        try:
+            company = Company.objects.select_related('account').get(
+                account_id=user_account.id_account
+            )
+            account = company.account
+
+            if not account.subscription_expires_at:
+                return Response(
+                    {
+                        "message": "You're not subscribed yet. Choose a plan to unlock messaging and start connecting with candidates."
+                    },
+                    status=403
+                )
+
+            if timezone.now() > account.subscription_expires_at:
+                return Response(
+                    {
+                        "message": "Your subscription has expired. Renew your plan to continue messaging and regain access to your chats."
+                    },
+                    status=403
+                )
+
+        except Company.DoesNotExist:
+            return Response(
+                {"message": "User has no associated company"},
+                status=403
+            )
 
     # -----------------------------------
     # 1. Mensajes donde participo

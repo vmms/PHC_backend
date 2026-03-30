@@ -112,6 +112,7 @@ staticfiles/
 *.docx 
 *.xlsx
 *.pptx 
+*.zip
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml

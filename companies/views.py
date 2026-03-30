@@ -147,6 +147,9 @@ def format_date(date):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_my_job_applications(request):
+
+
+
     try:
         company = Company.objects.get(account_id=request.user.id_account)
 
@@ -155,6 +158,19 @@ def list_my_job_applications(request):
                 {
                     "error": ("You cannot see the candidates who have applied because your account is inactive.")
                 },
+                status=status.HTTP_403_FORBIDDEN
+            )
+        account = company.account
+
+        if not account.subscription_expires_at:
+            return Response(
+                {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if timezone.now() > account.subscription_expires_at:
+            return Response(
+                {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -266,6 +282,20 @@ def list_my_jobs(request):
     except Company.DoesNotExist:
         return Response(
             {"message": "User has no associated company"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    account = company.account
+        
+    if not account.subscription_expires_at:
+        return Response(
+            {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    if timezone.now() > account.subscription_expires_at:
+        return Response(
+            {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features. You can no longer view your job postings until your subscription is active again."},
             status=status.HTTP_403_FORBIDDEN
         )
 
@@ -573,16 +603,33 @@ def search_candidates(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    if company.subscription == 'basic':
+    account = company.account
+
+    if not account.subscription_expires_at:
         return Response(
-            {"message": "Your subscription does not allow candidate search"},
+            {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
             status=status.HTTP_403_FORBIDDEN
         )
+
+    if timezone.now() > account.subscription_expires_at:
+        return Response(
+            {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+
+    # if company.subscription == 'basic':
+    #     return Response(
+    #         {"message": "Your subscription does not allow candidate search"},
+    #         status=status.HTTP_403_FORBIDDEN
+    #     )
 
     # -----------------------------------
     # 2. Base queryset
     # -----------------------------------
     candidates = Candidate.objects.filter(is_active=1).select_related('address')
+    if company.subscription == 'basic':
+        candidates = candidates.filter(job_type__iexact='temporary')
 
     # -----------------------------------
     # 3. Filtros simples
@@ -916,6 +963,16 @@ def search_candidates(request):
         filtered_candidates = candidates_data
 
     #print(filtered_candidates)
+
+    if not filtered_candidates:
+        return Response(
+            {
+                "message": "No candidates matched your search criteria.",
+                "candidates": []
+            },
+            status=200
+        )
+
     return Response({"candidates": filtered_candidates}, status=200)
 
 @api_view(['GET'])
@@ -1153,6 +1210,7 @@ def payment(request):
 
         # Actualizar company
         company.subscription = subscription_type
+        company.is_active = True
         company.save(update_fields=['subscription'])
 
         # Actualizar account
