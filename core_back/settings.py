@@ -179,7 +179,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
 EMAIL_HOST_USER = 'info@professionalhospitalityconnections.com'
-EMAIL_HOST_PASSWORD = 'gqfmwwinvomrdwgi'
+EMAIL_HOST_PASSWORD = 'jonyidxzbtbtginb'
 
 DEFAULT_FROM_EMAIL = 'Professional Hospitality Connections <info@professionalhospitalityconnections.com>'
 

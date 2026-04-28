@@ -85,12 +85,12 @@ def Process_payment_test(request):
     plan = request.data.get("subscription")
     if plan == "temp":
         return Response({
-            "payment_url": "https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=xO4UjnQAQeOlS5q4Q1QcWwAAAZzUOlrK", #"https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=OidnXG%2BpT%2ByHB6akdilHmQAAAZvsmGMz",
+            "payment_url": "https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=OidnXG%2BpT%2ByHB6akdilHmQAAAZvsmGMz",
             "reference": "google"
         })
     elif plan == "full":
         return Response({
-            "payment_url": "https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=xO4UjnQAQeOlS5q4Q1QcWwAAAZzUOlrK",#"https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=9cyYUJMwTFGUpvcRoHJu5gAAAZvsmSqP", 
+            "payment_url": "https://www.convergepay.com/hosted-payments?ssl_txn_auth_token=9cyYUJMwTFGUpvcRoHJu5gAAAZvsmSqP", 
             "reference": "google"
         })
     else:
