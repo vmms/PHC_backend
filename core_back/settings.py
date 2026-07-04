@@ -28,7 +28,7 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'    # cada ambiente lo cambia
 ALLOWED_HOSTS = [
     '127.0.0.1',
     #'localhost',
-    'd841-148-215-111-248.ngrok-free.app  ',
+    '1b8e-148-215-111-243.ngrok-free.app',
     '*',
     'test1-back-phc.us-west-1.elasticbeanstalk.com'
     ]
@@ -36,7 +36,7 @@ ALLOWED_HOSTS = [
 
 CSRF_TRUSTED_ORIGINS = [
     'https://test1-back-phc.us-west-1.elasticbeanstalk.com',
-    'https://d841-148-215-111-248.ngrok-free.app  /',
+    'https://1b8e-148-215-111-243.ngrok-free.app',
     #"https://96a967b472d0.ngrok-free.app ", 
     #"https://ruthe-unretributive-superscientifically.ngrok-free.dev",
     ]
@@ -194,7 +194,6 @@ DATABASES = {
         'PORT': os.environ.get('DB_PORT', '3306'),           # puerto MySQL local
     }
 }
-
 
 ELAVON_CONFIG = {
     "merchant_id": os.environ.get("ELAVON_MERCHANT_ID"), 
