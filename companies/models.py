@@ -1,6 +1,6 @@
 from django.db import models
 from accounts.models import Account
-from addresses.models import Address
+from addresses.models import Address 
 
 from django.utils.deconstruct import deconstructible
 from django.conf import settings

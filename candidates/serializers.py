@@ -20,11 +20,34 @@ class CandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Candidate
         fields = [
-            'id_candidate', 'account', 'first_name', 'last_name', 'phone_number',
-            'address', 'education', 'status', 'radius', 'adult', 'work_permission',
-            'web_link', 'about', 'photo', 'desired_position', 'years_experience', 
-            'last_position', 'last_company','email', 'job_type', 'employment_type', 
-            'modality','salary', 'cvu', 'servsafe', 'emergency_contact_name', 'emergency_contact_phone',
+            'id_candidate', 
+            'account', 
+            'first_name', 
+            'last_name', 
+            'phone_number',
+            'address', 
+            'education', 
+            'status', 
+            'radius', 
+            'adult', 
+            'work_permission',
+            'web_link', 
+            'about', 
+            'photo', 
+            'desired_position', 
+            'years_experience', 
+            'last_position', 
+            'last_company',
+            'email', 
+            'job_type', 
+            'employment_type', 
+            'modality',
+            'salary', 
+            'cvu', 
+            'open_to_work', 
+            'servsafe', 
+            'emergency_contact_name', 
+            'emergency_contact_phone',
             'schedules'
         ]
 
@@ -135,7 +158,15 @@ class CandidatePublicSerializer(serializers.ModelSerializer):
             'photo',
             'about',
             'address',
-            'education'
+            'education',
+            'radius',
+            'job_type',
+            'employment_type',
+            'modality',
+            'adult',
+            'servsafe',
+            'web_link',
+            'work_permission'
         ]
 
 class CandidateContactSerializer(serializers.ModelSerializer):
@@ -195,6 +226,7 @@ class CandidateAdminSerializer(serializers.ModelSerializer):
             'photo',
             'cvu',
             'servsafe',
+            'open_to_work', 
             'schedules',
             'profile_views', 
             'cvu_downloads',

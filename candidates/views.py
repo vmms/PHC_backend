@@ -15,6 +15,7 @@ from schedulers.models import Scheduler
 from companies.models import Company
 from companies.serializers import CompanySerializer
 from candidates.services import get_candidate_admin_stats
+from addresses.services import geocode_address, get_address_snapshot, address_has_changed
 
 from django.utils.deconstruct import deconstructible
 from django.conf import settings
@@ -45,6 +46,24 @@ def get_candidate(request):
         candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
         return Response({'message': 'No candidate associated with this user'}, status=404)
+
+    # ===========================
+    # GEOCODING LAZY
+    # ===========================
+    address = candidate.address
+
+    if address:
+        has_location_data = any([
+            address.city,
+            address.state,
+            address.zip_code,
+            address.country,
+        ])
+
+        has_coordinates = address.latitude is not None and address.longitude is not None
+
+        if has_location_data and not has_coordinates:
+            geocode_address(address)
 
     temp_schedule = defaultdict(list)
 
@@ -160,14 +179,19 @@ def create_candidate(request):
     response_data = serializer.format_response(candidate)
     return Response(response_data, status=status.HTTP_201_CREATED)
 
+from addresses.services import geocode_address, get_address_snapshot, address_has_changed
+
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_candidate(request):
-    # print(request.data)
     try:
         candidate = Candidate.objects.get(account_id=request.user.id_account)
     except Candidate.DoesNotExist:
-        return Response({'message': 'No candidate associated with this user'}, status=404)
+        return Response(
+            {'message': 'No candidate associated with this user'},
+            status=404
+        )
 
     data = request.data.copy()
 
@@ -175,62 +199,82 @@ def update_candidate(request):
     # 1. ADDRESS UPDATE
     # ===========================
     address_data = data.pop('address', None)
+
     if address_data:
+        old_address_snapshot = get_address_snapshot(candidate.address)
+
+        address_fields = {
+            "street",
+            "city",
+            "state",
+            "zip_code",
+            "country",
+        }
+
         for field, value in address_data.items():
-            setattr(candidate.address, field, value)
+            if field in address_fields:
+                setattr(candidate.address, field, value)
+
         candidate.address.save()
+
+        if address_has_changed(old_address_snapshot, candidate.address):
+            geocode_address(candidate.address)
 
     # ===========================
     # 2. EDUCATION UPDATE
     # ===========================
     education_data = data.pop('education', None)
+
     if education_data:
         for field, value in education_data.items():
             setattr(candidate.education, field, value)
+
         candidate.education.save()
 
     # ===========================
     # 3. CANDIDATE FIELDS UPDATE
     # ===========================
     for field, value in data.items():
-        if field not in ["schedule"]:  # schedule se procesa aparte
+        if field not in ["schedule"]:
             setattr(candidate, field, value)
 
     candidate.save()
 
     # ===========================
-    # 4. SCHEDULE UPDATE (BORRAR + CREAR)
+    # 4. SCHEDULE UPDATE
     # ===========================
     schedule_data = request.data.get("schedule", [])
 
     if schedule_data:
-        # 4.1 borrar relaciones actuales
         CandidateHasSchedule.objects.filter(candidate=candidate).delete()
 
         for sched_block in schedule_data:
             perm = sched_block.get("permanent")
+
             if perm:
                 start_date = perm.get("start_date")
                 days = perm.get("days", [])
 
                 for day_data in days:
-                    # crear scheduler usando tu modelo REAL
                     new_sched = Scheduler.objects.create(
                         type="permanent",
                         day=day_data["day"],
                         date_start=start_date,
                         date_end=None,
                         time_start=day_data["time_start"],
-                        time_finish=day_data["time_end"]  # JSON usa time_end, modelo usa time_finish
+                        time_finish=day_data["time_end"]
                     )
 
-                    # crear relación
                     CandidateHasSchedule.objects.create(
                         candidate=candidate,
                         schedule_id=new_sched.id_schedule
                     )
 
-    return Response({"message": "Candidate updated successfully"}, status=200)
+    return Response(
+        {"message": "Candidate updated successfully"},
+        status=200
+    )
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
@@ -822,6 +866,9 @@ def search_candidate_admin(request):
         modality = data.get('modality')
         salary = data.get('salary')
         is_active = data.get('is_active')
+        email = data.get('email')
+        phone_number = data.get('phone_number')
+
 
         last_position = data.get('last_position')
         adult = data.get('adult')
@@ -842,6 +889,9 @@ def search_candidate_admin(request):
 
         if last_name:
             candidates = candidates.filter(last_name__icontains=last_name)
+
+        if email:
+            candidates = candidates.filter(email__icontains=email)
 
         if desired_position:
             candidates = candidates.filter(desired_position__icontains=desired_position)
@@ -875,6 +925,12 @@ def search_candidate_admin(request):
 
         if servsafe is not None:
             candidates = candidates.filter(servsafe=servsafe)
+
+        if email:
+            candidates = candidates.filter(email__icontains=email)
+
+        if phone_number:
+            candidates = candidates.filter(phone_number__icontains=phone_number)
 
         # -------------------------------
         # APPLICATIONS COUNT
@@ -1082,4 +1138,41 @@ def candidate_admin_stats(request):
                 "details": str(e)
             },
             status=500
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_open_to_work(request):
+    print(request)
+    try:
+        candidate = Candidate.objects.get(account_id=request.user.id_account)
+        print(candidate)
+        candidate.open_to_work = not candidate.open_to_work
+        print(candidate.open_to_work)
+        candidate.save(update_fields=['open_to_work'])
+
+        message = (
+            "Your profile has been paused. Companies will no longer see you in search results."
+            if not candidate.open_to_work
+            else
+            "Your profile is active again. Companies can now find you in search results."
+        )
+
+        return Response({
+                "message": message,
+                "open_to_work": candidate.open_to_work
+                },status=status.HTTP_200_OK
+        )
+
+    except Candidate.DoesNotExist:
+        return Response({
+                "error": "No candidate associated with this user."
+                },status=status.HTTP_404_NOT_FOUND
+        )
+
+    except Exception as e:
+        return Response({
+                "error": "Unable to update open to work status.",
+                "details": str(e)
+            },status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -21,9 +21,6 @@ def create_candidate_internal(*, id_account, email):
         "last_name": "",
         "phone_number": "",
         "email": email,
-        "servsafe": "na",
-        "adult": 1,
-        "work_permission": 1,
         "schedule": []
     }
 
@@ -33,6 +30,11 @@ def create_candidate_internal(*, id_account, email):
     # MISMA LÓGICA DE create_candidate
     # =============================
     with transaction.atomic():
+
+        print("create_candidate_internal NUEVA VERSION")
+        print("adult:", None)
+        print("work_permission:", None)
+        print("servsafe:", None)
 
         candidate = Candidate.objects.create(
             account=account,
@@ -53,13 +55,13 @@ def create_candidate_internal(*, id_account, email):
             modality=None,
             salary=None,
             radius=None,
-            adult=data.get("adult"),
-            work_permission=data.get("work_permission"),
+            adult=None,
+            work_permission=None,
             web_link=None,
             about=None,
             photo=None,
             cvu=None,
-            servsafe=data.get("servsafe"),
+            servsafe=None,
             status="active"
         )
 

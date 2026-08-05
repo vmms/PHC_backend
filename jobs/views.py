@@ -11,6 +11,7 @@ from accounts.models import Account
 from django.db import transaction
 from collections import defaultdict
 from jobs.services import get_jobs_admin_stats
+from payments.services import sync_company_subscription_from_converge, company_has_valid_subscription
 
 
 from skills.models import Skill
@@ -166,10 +167,21 @@ def create_job(request):
     # if not allowed:
     #     return Response({'message': reason}, status=status.HTTP_403_FORBIDDEN)
 
-    if not company.is_active:
+    has_subscription, payment = company_has_valid_subscription(company.account)
+        
+    if not has_subscription:
+
+        if payment and payment.status == "cancelled":
+            return Response(
+                {
+                    "message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return Response(
             {
-                "message": "Your company profile is inactive."
+                "message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."
             },
             status=status.HTTP_403_FORBIDDEN
         )

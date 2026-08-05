@@ -8,6 +8,10 @@ class Address(models.Model):
     zip_code = models.CharField(max_length=10, null=True, blank=True)
     country = models.CharField(max_length=45, null=True, blank=True)
 
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    geocoded_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'address'
         managed = False

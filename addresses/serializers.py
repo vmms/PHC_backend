@@ -10,8 +10,18 @@ class AddressSerializer(serializers.ModelSerializer):
             'state', 
             'city', 
             'zip_code', 
-            'country'
+            'country',
+            'latitude',
+            'longitude',
+            'geocoded_at',
         ]
+
+        read_only_fields = [
+            'latitude',
+            'longitude',
+            'geocoded_at',
+        ]
+
 
 class AddressPublicSerializer(serializers.ModelSerializer):
     class Meta:

@@ -13,11 +13,17 @@ from companies.models import Company
 from candidates.models import Candidate
 from addresses.models import Address
 from candidates.services import create_candidate_internal
+from payments.services import sync_company_subscription_from_converge
 
 import secrets
 import string
-from django.db.models import Q
+from django.db.models import Q 
 from django.core.mail import send_mail
+
+from .emails import (
+    WELCOME_PLAIN_MESSAGE,
+    WELCOME_HTML_MESSAGE
+)
 
 
 @api_view(['GET'])
@@ -35,58 +41,107 @@ from django.conf import settings
 @permission_classes([])
 def create_account(request):
     username = request.data.get('user')
+    subscription = request.data.get('subscription')
+    # phone_number = request.data.get('phone_number')
 
+    # -------------------------------------------------------
+    # VALIDACIONES
+    # -------------------------------------------------------
     if not username:
         return Response(
-            {"detail": "User is required"},
+            {"detail": "Email is required"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    # if subscription == "candidate" and not phone_number:
+    #     return Response(
+    #         {"detail": "Phone number is required"},
+    #         status=status.HTTP_400_BAD_REQUEST
+    #     )
 
     if Account.objects.filter(user=username).exists():
         return Response(
-            {"detail": "This username is already in use."},
+            {"detail": "This email is already in use."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # -------------------------------------------------------
+    # SERIALIZER
+    # -------------------------------------------------------
     serializer = AccountSerializer(data=request.data)
+
     if serializer.is_valid():
-        account = serializer.save(email=username)  # 👈 GUARDA el objeto
-        print("account: ",account.id_account)
-        
+
+        # -------------------------------------------------------
+        # CREAR ACCOUNT
+        # -------------------------------------------------------
+        account = serializer.save(email=username)
+
+        print("account:", account.id_account)
+
+        # -------------------------------------------------------
+        # CREAR PERFIL SEGÚN TIPO
+        # -------------------------------------------------------
         if account.subscription == "candidate":
+
+            print("Vamos a empezar")
+
             create_candidate_internal(
                 id_account=account.id_account,
-                email=account.email
+                email=account.email,
+                # phone_number=phone_number
             )
 
         elif account.subscription == "company":
+
             from companies.services import create_company_internal
 
             create_company_internal(
                 id_account=account.id_account,
                 email=account.email
             )
-        
-        elif account.subscription == "admin":
-            pass 
 
-        send_mail(
-            subject="Welcome to Professional Hospitality Connections",
-            message=(
-                "Welcome to Professional Hospitality Connections!\n\n"
-                "Your account has been successfully created.\n\n"
-                "You can now log in and start exploring the platform.\n\n"
-                "Best regards,\n"
-                "Professional Hospitality Connections"
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[account.email],
-            fail_silently=False  
+        elif account.subscription == "admin":
+            pass
+
+        # -------------------------------------------------------
+        # ENVIAR EMAIL DE BIENVENIDA SEGÚN TIPO DE CUENTA
+        # -------------------------------------------------------
+        if account.subscription == "candidate":
+            email_subject = "Welcome to Professional Hospitality Connections"
+            email_plain_message = WELCOME_PLAIN_MESSAGE
+            email_html_message = WELCOME_HTML_MESSAGE
+
+        elif account.subscription == "company":
+            email_subject = "Thank You for Signing Up & Welcome to Professional Hospitality Connections"
+            email_plain_message = WELCOME_COMPANY_PLAIN_MESSAGE
+            email_html_message = WELCOME_COMPANY_HTML_MESSAGE
+
+        else:
+            email_subject = None
+            email_plain_message = None
+            email_html_message = None
+
+
+        if email_subject:
+            send_mail(
+                subject=email_subject,
+                message=email_plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[account.email],
+                html_message=email_html_message,
+                fail_silently=False
+            )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED
         )
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(
+        serializer.errors,
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
 @api_view(['POST'])
 @permission_classes([])
@@ -237,7 +292,6 @@ def facebook_register(request):
         "subscription": account.subscription
     }, status=status.HTTP_200_OK)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def read_account(request):
@@ -330,7 +384,7 @@ def token_login(request):
             # Crear cuenta nueva automáticamente
             serializer = AccountSerializer(data={
                 "user": username,
-                "password": "social-login-placeholder",  # password dummy
+                "password": "social-login-placeholder",
                 "subscription": base_type,
                 "email": username,
                 "google_id": request.data.get("google_id") or username,
@@ -338,12 +392,20 @@ def token_login(request):
             })
             if serializer.is_valid():
                 account = serializer.save()
+
                 # Crear registro interno según tipo
                 if base_type == "candidate":
-                    create_candidate_internal(id_account=account.id_account, email=account.email)
+                    create_candidate_internal(
+                        id_account=account.id_account,
+                        email=account.email
+                    )
                 elif base_type == "company":
                     from companies.services import create_company_internal
-                    create_company_internal(id_account=account.id_account, email=account.email)
+                    create_company_internal(
+                        id_account=account.id_account,
+                        email=account.email
+                    )
+
                 # Enviar correo de bienvenida
                 send_mail(
                     subject="Welcome to Professional Hospitality Connections",
@@ -356,7 +418,7 @@ def token_login(request):
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[account.email],
-                    fail_silently=False  
+                    fail_silently=False
                 )
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -369,6 +431,7 @@ def token_login(request):
                 {"code": 0, "message": "Password is required for this login type."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         try:
             account = Account.objects.get(user=username)
         except Account.DoesNotExist:
@@ -376,6 +439,7 @@ def token_login(request):
                 {"code": 0, "message": "User not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
+
         if account.password != password:
             return Response(
                 {"code": 0, "message": "Invalid password."},
@@ -397,14 +461,30 @@ def token_login(request):
 
             if base_type == 'company' and not is_company:
                 return Response(
-                    {"code": 0, "message": "This account is not a company account. Please log in as a candidate."},
+                    {
+                        "code": 0,
+                        "message": "This account is not a company account. Please log in as a candidate."
+                    },
                     status=status.HTTP_403_FORBIDDEN
                 )
+
             if base_type == 'candidate' and not is_candidate:
                 return Response(
-                    {"code": 0, "message": "This account is not a candidate account. Please log in as a company."},
+                    {
+                        "code": 0,
+                        "message": "This account is not a candidate account. Please log in as a company."
+                    },
                     status=status.HTTP_403_FORBIDDEN
                 )
+
+    # -------------------------------
+    # SYNC COMPANY SUBSCRIPTION
+    # Only applies to company / company-google
+    # -------------------------------
+    subscription_info = None
+
+    if base_type == "company":
+        subscription_info = sync_company_subscription_from_converge(account)
 
     # -------------------------------
     # CREATE TOKENS
@@ -417,7 +497,7 @@ def token_login(request):
     refresh['type_account'] = type_account
 
     access = AccessToken()
-    access.set_exp(lifetime=timedelta(hours=1))
+    access.set_exp(lifetime=timedelta(hours=4))
     access['id_account'] = account.id_account
     access['user'] = account.user
     access['subscription'] = account.subscription
@@ -432,7 +512,8 @@ def token_login(request):
             "id_account": account.id_account,
             "user": account.user,
             "subscription": account.subscription,
-            "type_account": type_account
+            "type_account": type_account,
+            "subscription_info": subscription_info
         },
         status=status.HTTP_200_OK
     )
@@ -647,7 +728,6 @@ def recover_password(request):
     )
 
     return Response(generic_response, status=status.HTTP_200_OK)
-
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])

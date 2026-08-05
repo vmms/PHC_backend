@@ -18,10 +18,13 @@ from jobApplication.serializers import JobApplicationSerializer
 from candidates.models import Candidate, CandidateHasSchedule
 from candidates.serializers import CandidatePublicSerializer, CandidateContactSerializer
 from companies.services import get_company_admin_stats
+from addresses.services import geocode_address, get_address_snapshot, address_has_changed
+from payments.services import sync_company_subscription_from_converge, company_has_valid_subscription
+import time as time_module
 
 from geopy.geocoders import Nominatim
 from math import radians, sin, cos, sqrt, atan2
-from datetime import datetime, time
+from datetime import datetime, time as datetime_time
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 from django.db.models import Max
@@ -63,16 +66,20 @@ def list_companies(request):
 @permission_classes([IsAuthenticated])
 def get_company(request):
     try:
-        # Usar account_id en lugar de account
         company = Company.objects.get(account_id=request.user.id_account)
         serializer = CompanyAdminSerializer(company, context={'request': request})
-        return Response(serializer.data, status=200)
+        subscription_info = sync_company_subscription_from_converge(company.account)
+
+        data = serializer.data
+        data["subscription_info"] = subscription_info
+
+        return Response(data, status=200)
+
     except Company.DoesNotExist:
         return Response(
-            {'message': 'No company associated with this user'}, 
+            {'message': 'No company associated with this user'},
             status=404
         )
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -119,14 +126,27 @@ def update_company(request):
     try:
         company = Company.objects.get(account=request.user)
     except Company.DoesNotExist:
-        return Response({'message': 'No company associated with this user'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {'message': 'No company associated with this user'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    old_address_snapshot = get_address_snapshot(company.address)
 
     serializer = CompanySerializer(company, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    if serializer.is_valid():
+        company = serializer.save()
+
+        if address_has_changed(old_address_snapshot, company.address):
+            geocode_address(company.address)
+
+        company.refresh_from_db()
+        response_serializer = CompanySerializer(company)
+
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 def delete_company(request, pk):
@@ -144,11 +164,16 @@ def format_date(date):
         return None
     return date.strftime("%m-%d-%Y")
 
-@api_view(['GET'])
+
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def list_my_job_applications(request):
 
-
+    def clean_param(value):
+        value = (value or "").strip()
+        if value.lower() in ["null", "undefined", "none"]:
+            return ""
+        return value
 
     try:
         company = Company.objects.get(account_id=request.user.id_account)
@@ -156,34 +181,45 @@ def list_my_job_applications(request):
         if not company.is_active:
             return Response(
                 {
-                    "error": ("You cannot see the candidates who have applied because your account is inactive.")
+                    "error": (
+                        "If your account is inactive, your published work will not be visible."
+                    )
                 },
                 status=status.HTTP_403_FORBIDDEN
             )
-        account = company.account
 
-        if not account.subscription_expires_at:
+        has_subscription, payment = company_has_valid_subscription(company.account)
+
+        if not has_subscription:
+
+            if payment and payment.status == "cancelled":
+                return Response(
+                    {
+                        "message": (
+                            "Your subscription has expired. We'd love to have you continue "
+                            "with us, please renew your plan to keep using all features."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
             return Response(
-                {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
+                {
+                    "message": (
+                        "Your subscription is not active yet. Subscribe now to unlock "
+                        "all features and start using the platform."
+                    )
+                },
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        if timezone.now() > account.subscription_expires_at:
-            return Response(
-                {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # -----------------------------------
+        # Filtros desde body/request.data
+        # -----------------------------------
+        title = clean_param(request.data.get("title"))
+        first_name = clean_param(request.data.get("first_name"))
+        last_name = clean_param(request.data.get("last_name"))
 
-        # -----------------------------------
-        # 3. Filtros (GET → query_params)
-        # -----------------------------------
-        title = request.query_params.get("title")
-        first_name = request.query_params.get("first_name")
-        last_name = request.query_params.get("last_name")
-
-        # -----------------------------------
-        # 4. Jobs de la company (solo activos)
-        # -----------------------------------
         jobs = Job.objects.filter(
             company_id=company.id_company,
             is_active=True
@@ -203,7 +239,6 @@ def list_my_job_applications(request):
                 id_candidate__is_active=True
             )
 
-            # 🔹 Filtros por candidato
             if first_name:
                 applications = applications.filter(
                     id_candidate__first_name__icontains=first_name
@@ -220,6 +255,7 @@ def list_my_job_applications(request):
             )
 
             applications_data = []
+
             for app in applications:
                 applications_data.append({
                     "id_job_application": app.id_job_application,
@@ -234,7 +270,6 @@ def list_my_job_applications(request):
                     "updated_at": format_date(app.updated_at),
                 })
 
-            # 🔹 No regresar jobs sin applications
             if applications_data:
                 jobs_data.append({
                     "id_jobs": job.id_jobs,
@@ -285,17 +320,22 @@ def list_my_jobs(request):
             status=status.HTTP_403_FORBIDDEN
         )
     
-    account = company.account
+    has_subscription, payment = company_has_valid_subscription(company.account)
         
-    if not account.subscription_expires_at:
-        return Response(
-            {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    if not has_subscription:
 
-    if timezone.now() > account.subscription_expires_at:
+        if payment and payment.status == "cancelled":
+            return Response(
+                {
+                    "message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return Response(
-            {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features. You can no longer view your job postings until your subscription is active again."},
+            {
+                "message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."
+            },
             status=status.HTTP_403_FORBIDDEN
         )
 
@@ -351,7 +391,7 @@ def list_my_jobs(request):
 
             geolocator = Nominatim(user_agent="PHC_backend_list_my_jobs")
             city_loc = geolocator.geocode(location, timeout=10)
-            time.sleep(2)
+            time_module.sleep(2)
 
             if not city_loc:
                 return Response(
@@ -581,15 +621,14 @@ def hours_intersect(start1, end1, start2, end2):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def search_candidates(request):
-    # print("request.data:")
-    # print(request.data)
     data = request.data or {}
-
+    print(data)
     # -----------------------------------
     # 1. Validar company desde account
     # -----------------------------------
     try:
         company = Company.objects.get(account_id=request.user.id_account)
+
         if not company.is_active:
             return Response(
                 {
@@ -597,37 +636,37 @@ def search_candidates(request):
                 },
                 status=status.HTTP_403_FORBIDDEN
             )
+
     except Company.DoesNotExist:
         return Response(
             {"message": "User has no associated company"},
             status=status.HTTP_403_FORBIDDEN
         )
 
-    account = company.account
+    has_subscription, payment = company_has_valid_subscription(company.account)
 
-    if not account.subscription_expires_at:
+    if not has_subscription:
+
+        if payment and payment.status == "cancelled":
+            return Response(
+                {
+                    "message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return Response(
-            {"message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."},
+            {
+                "message": "Your subscription is not active yet. Subscribe now to unlock all features and start using the platform."
+            },
             status=status.HTTP_403_FORBIDDEN
         )
-
-    if timezone.now() > account.subscription_expires_at:
-        return Response(
-            {"message": "Your subscription has expired. We'd love to have you continue with us, please renew your plan to keep using all features."},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
-
-    # if company.subscription == 'basic':
-    #     return Response(
-    #         {"message": "Your subscription does not allow candidate search"},
-    #         status=status.HTTP_403_FORBIDDEN
-    #     )
 
     # -----------------------------------
     # 2. Base queryset
     # -----------------------------------
     candidates = Candidate.objects.filter(is_active=1).select_related('address')
+
     if company.subscription == 'basic':
         candidates = candidates.filter(job_type__iexact='temporary')
 
@@ -648,8 +687,6 @@ def search_candidates(request):
     years_experience = data.get('years_experience')
     servsafe = data.get('servsafe')
 
-
-    location = data.get('location')        # ciudad de referencia
     radius_miles = data.get('radius_miles', 350)
 
     if first_name and isinstance(first_name, str) and first_name.lower() != 'none':
@@ -682,8 +719,9 @@ def search_candidates(request):
                 {"message": "salary must be a number"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
     if last_position and isinstance(last_position, str) and last_position.lower() != 'none':
-        candidates = candidates.filter(last_position__iexact=last_position)
+        candidates = candidates.filter(last_position__icontains=last_position)
 
     if adult and isinstance(adult, str) and adult.lower() != 'none':
         if adult.lower() == 'yes':
@@ -691,7 +729,7 @@ def search_candidates(request):
         elif adult.lower() == 'no':
             adult_value = 0
         else:
-            adult_value = None  # por si mandan algo raro
+            adult_value = None
 
         if adult_value is not None:
             candidates = candidates.filter(adult=adult_value)
@@ -706,7 +744,7 @@ def search_candidates(request):
 
         if wp_value is not None:
             candidates = candidates.filter(work_permission=wp_value)
-    
+
     if years_experience not in (None, "", "none"):
         try:
             years_experience = int(years_experience)
@@ -716,78 +754,103 @@ def search_candidates(request):
                 {"message": "years_experience must be a number"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
+
     if servsafe and isinstance(servsafe, str) and servsafe.lower() != 'none':
         candidates = candidates.filter(servsafe__iexact=servsafe)
-    
 
     # -----------------------------------
-    # 4. Filtro por distancia (CON CACHE)
+    # 4. Filtro por distancia usando dirección de la compañía
     # -----------------------------------
-    if location and isinstance(location, str) and location.lower() != 'none':
-        try:
-            geolocator = Nominatim(user_agent="PHC_backend_search_candidates")
-            ref_loc = geolocator.geocode(location, timeout=10)
+    try:
+        radius_miles = float(radius_miles)
+    except (TypeError, ValueError):
+        return Response(
+            {"message": "radius_miles must be a number"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-            if not ref_loc:
-                return Response(
-                    {"message": "Reference city not found"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+    company_address = company.address
 
-            ref_lat, ref_lng = ref_loc.latitude, ref_loc.longitude
-            radius_miles = float(radius_miles)
+    if not company_address:
+        return Response(
+            {"message": "Company address not found"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-        except Exception as e:
-            return Response(
-                {"message": f"Error obtaining coordinates: {e}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    has_company_location_data = any([
+        company_address.city,
+        company_address.state,
+        company_address.zip_code,
+        company_address.country,
+    ])
 
-        geo_cache = {}       
-        request_count = 0
-        filtered_candidates = []
+    if not has_company_location_data:
+        return Response(
+            {"message": "Company address is incomplete"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-        for candidate in candidates:
-            addr = candidate.address
-            if not addr or not addr.city:
-                continue
+    has_company_coordinates = (
+        company_address.latitude is not None and
+        company_address.longitude is not None
+    )
 
-            addr_key = f"{addr.city}|{addr.state}|{addr.country}"
+    if not has_company_coordinates:
+        geocode_address(company_address)
+        company_address.refresh_from_db()
+        time_module.sleep(2.5)
 
-            # -------------------------
-            # Cache hit
-            # -------------------------
-            if addr_key in geo_cache:
-                cand_lat, cand_lng = geo_cache[addr_key]
+    if company_address.latitude is None or company_address.longitude is None:
+        return Response(
+            {"message": "Company coordinates could not be calculated"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-            # -------------------------
-            # Cache miss
-            # -------------------------
-            else:
-                try:
-                    if request_count > 0:
-                        time.sleep(1.2)  # delay controlado
+    ref_lat = float(company_address.latitude)
+    ref_lng = float(company_address.longitude)
 
-                    query = f"{addr.city}, {addr.state or ''}, {addr.country or ''}"
-                    loc = geolocator.geocode(query, timeout=10)
-                    request_count += 1
+    print("ANTES distancia:", candidates.count())
 
-                    if not loc:
-                        continue
+    filtered_by_distance = []
 
-                    cand_lat, cand_lng = loc.latitude, loc.longitude
-                    geo_cache[addr_key] = (cand_lat, cand_lng)
+    for candidate in candidates:
+        addr = candidate.address
 
-                except Exception:
-                    continue
+        if not addr:
+            continue
 
-            dist = haversine(ref_lat, ref_lng, cand_lat, cand_lng)
+        has_candidate_location_data = any([
+            addr.city,
+            addr.state,
+            addr.zip_code,
+            addr.country,
+        ])
 
-            if dist <= radius_miles:
-                filtered_candidates.append(candidate)
+        if not has_candidate_location_data:
+            continue
 
-        candidates = filtered_candidates
+        has_candidate_coordinates = (
+            addr.latitude is not None and
+            addr.longitude is not None
+        )
+
+        if not has_candidate_coordinates:
+            geocode_address(addr)
+            addr.refresh_from_db()
+            time_module.sleep(2.5)
+
+        if addr.latitude is None or addr.longitude is None:
+            continue
+
+        cand_lat = float(addr.latitude)
+        cand_lng = float(addr.longitude)
+
+        dist = haversine(ref_lat, ref_lng, cand_lat, cand_lng)
+
+        if dist <= radius_miles:
+            filtered_by_distance.append(candidate)
+
+    candidates = filtered_by_distance
 
     # -----------------------------------
     # 5. Serializar + Schedule
@@ -974,6 +1037,7 @@ def search_candidates(request):
         )
 
     return Response({"candidates": filtered_candidates}, status=200)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

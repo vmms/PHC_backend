@@ -44,7 +44,10 @@ def create_candidate_internal(*, id_account, email):
 
             first_name="",
             last_name="",
-            phone_number="",
+
+            # AHORA SE GUARDA EL TELÉFONO
+            # phone_number=phone_number,
+
             emergency_contact_name="",
             emergency_contact_phone="",
 
@@ -52,11 +55,11 @@ def create_candidate_internal(*, id_account, email):
             education=education,
 
             email=email,
-            salary="",        # ⚠️ este campo NO es null en tu modelo
-            servsafe="na",
+            salary="",
+            servsafe=None,
 
-            adult=True,
-            work_permission=True,
+            adult=None,
+            work_permission=None,
             status="active",
         )
 
@@ -79,6 +82,17 @@ def get_candidate_admin_stats():
 
     new_this_month = Candidate.objects.filter(
         created_at__gte=start_month
+    ).count()
+
+    # -----------------------
+    # JOB TYPE
+    # -----------------------
+    permanent_candidates = Candidate.objects.filter(
+        job_type__iexact='permanent'
+    ).count()
+
+    temporary_candidates = Candidate.objects.filter(
+        job_type__iexact='temporary'
     ).count()
 
     # -----------------------
@@ -121,6 +135,10 @@ def get_candidate_admin_stats():
             "new_this_week": new_this_week,
             "new_this_month": new_this_month,
         },
+        "job_type": {
+            "permanent": permanent_candidates,
+            "temporary": temporary_candidates
+        },
         "top_3_most_applications": [
             serialize_candidate(c) for c in top_3_most
         ],
@@ -128,7 +146,10 @@ def get_candidate_admin_stats():
             serialize_candidate(c) for c in top_3_least
         ],
         "top_3_desired_positions": [
-            {"desired_position": p['desired_position'], "count": p['position_count']}
+            {
+                "desired_position": p["desired_position"],
+                "count": p["position_count"]
+            }
             for p in top_desired_positions
         ]
     }

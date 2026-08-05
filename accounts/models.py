@@ -12,7 +12,7 @@ class Account(models.Model):
     facebook_id = models.CharField(max_length=255, null=True, blank=True)
 
     subscription_expires_at = models.DateTimeField(null=True, blank=True)
-
+    subscription_started_at = models.DateTimeField(null=True, blank=True)
     observations_admin = models.TextField(null=True, blank=True)  
 
     class Meta:

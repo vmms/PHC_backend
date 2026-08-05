@@ -4,6 +4,17 @@ from django.contrib.auth.hashers import check_password
 from django.utils import timezone
 
 class AccountSerializer(serializers.ModelSerializer):
+
+    subscription_started_at = serializers.DateTimeField(
+        format="%d/%m/%Y",
+        read_only=True
+    )
+    subscription_expires_at = serializers.DateTimeField(
+        format="%d/%m/%Y",
+        read_only=True
+    )
+
+
     class Meta:
         model = Account
         fields = [
@@ -14,11 +25,13 @@ class AccountSerializer(serializers.ModelSerializer):
             'password',
             'subscription',
             'subscription_expires_at',
+            'subscription_started_at',
         ]
         extra_kwargs = {
             'password': {'write_only': True, 'required': False},
             'email': {'required': False}
         }
+
 
 class AccountLoginSerializer(serializers.Serializer):
     user = serializers.CharField()
@@ -72,6 +85,7 @@ class ErrorResponseSerializer(serializers.Serializer):
         ref_name = "ErrorResponse"
 
 class AccountAdminSerializer(serializers.ModelSerializer):
+    subscription_started_at = serializers.DateTimeField(format="%d/%m/%Y")
     subscription_expires_at = serializers.DateTimeField(format="%d/%m/%Y")
     days_to_expire = serializers.SerializerMethodField()
 
@@ -86,6 +100,7 @@ class AccountAdminSerializer(serializers.ModelSerializer):
             'subscription_expires_at',
             'observations_admin',
             'days_to_expire',
+            'subscription_started_at'
         ]
 
     def get_days_to_expire(self, obj):
@@ -96,3 +111,4 @@ class AccountAdminSerializer(serializers.ModelSerializer):
         delta = obj.subscription_expires_at - now
 
         return max(delta.days, 0)  # evita negativos
+

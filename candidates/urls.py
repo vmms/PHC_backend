@@ -18,4 +18,5 @@ urlpatterns = [
     path('toggle_candidate_active/', views.toggle_candidate_active, name='toggle_candidate_active'),
     path('search_candidate_admin/', views.search_candidate_admin, name='search_candidate_admin'),
     path('candidate_admin_stats/', views.candidate_admin_stats, name='candidate_admin_stats'),
+    path('open_to_work/', views.toggle_open_to_work, name='toggle_open_to_work'),
 ]

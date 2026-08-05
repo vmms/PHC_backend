@@ -11,6 +11,12 @@ from companies.models import Company
 from accounts.models import Account
 from django.utils import timezone
 
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils.html import escape
+from .emails import send_new_message_email
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_message(request):
@@ -22,7 +28,7 @@ def create_message(request):
     receiver_candidate_id = request.data.get("receiver_candidate_id")
     receiver_company_id = request.data.get("receiver_company_id")
     text = request.data.get("message")
-    title = request.data.get("title")  
+    title = request.data.get("title")
     origin = request.data.get("origin")
 
     if not text:
@@ -52,6 +58,7 @@ def create_message(request):
     if account_type == "candidate":
         if not receiver_company_id:
             return Response({"error": "Must send receiver_company_id"}, status=400)
+
         try:
             company = Company.objects.get(id_company=receiver_company_id)
             receiver_account_id = company.account_id
@@ -61,26 +68,28 @@ def create_message(request):
     elif account_type in ["company", "premium"]:
         if not receiver_candidate_id:
             return Response({"error": "Must send receiver_candidate_id"}, status=400)
+
         try:
             company = Company.objects.get(account_id=request.user.id_account)
             candidate = Candidate.objects.get(id_candidate=receiver_candidate_id)
-            # -------------------------------------------------------
-            # VALIDAR SI EL RECEPTOR (CANDIDATO) ESTÁ ACTIVO
-            # -------------------------------------------------------
+
             if not company.is_active:
                 return Response(
                     {"error": "You cannot send messages because your account is inactive."},
                     status=status.HTTP_403_FORBIDDEN
-                ) 
+                )
+
             if not candidate.is_active:
                 return Response(
                     {"error": "Cannot send messages to an inactive candidate"},
                     status=status.HTTP_403_FORBIDDEN
                 )
-                
+
             receiver_account_id = candidate.account_id
+
         except Candidate.DoesNotExist:
             return Response({"error": "Candidate not found"}, status=404)
+
     else:
         return Response({"error": "Unknown account type"}, status=400)
 
@@ -94,7 +103,7 @@ def create_message(request):
 
     if conversation:
         conversation_id = conversation.conversation_id
-        conversation_title = title   # solo para ESTE mensaje
+        conversation_title = title
 
     else:
         max_conv = Message.objects.aggregate(
@@ -108,15 +117,16 @@ def create_message(request):
             print("First contact")
             try:
                 company = Company.objects.get(account_id=request.user.id_account)
+
                 if origin == "applications":
                     company.first_contact_applications += 1
                 else:
                     company.first_contact_search += 1
+
                 company.save()
+
             except Company.DoesNotExist:
-                return Response({"error": "Company not found"}, status=404)  
-        else:
-            pass
+                return Response({"error": "Company not found"}, status=404)
 
     # -------------------------------------------------------
     # Crear mensaje
@@ -129,6 +139,27 @@ def create_message(request):
         conversation_id=conversation_id,
         title=conversation_title
     )
+
+    # -------------------------------------------------------
+    # Enviar correo al receptor
+    # -------------------------------------------------------
+    try:
+        receiver_account = Account.objects.get(id_account=receiver_account_id)
+
+        if receiver_account.email:
+            preview_length = max(1, int(len(text) * 0.25))
+            message_preview = text[:preview_length].strip() + "..."
+
+            send_new_message_email(
+                receiver_email=receiver_account.email,
+                message_preview=message_preview
+            )
+
+    except Account.DoesNotExist:
+        print("Receiver account not found, email not sent")
+
+    except Exception as e:
+        print("Error sending message notification email:", e)
 
     return Response(MessageSerializer(message).data, status=201)
 
@@ -151,21 +182,21 @@ def list_chats(request):
             )
             account = company.account
 
-            if not account.subscription_expires_at:
-                return Response(
-                    {
-                        "message": "You're not subscribed yet. Choose a plan to unlock messaging and start connecting with candidates."
-                    },
-                    status=403
-                )
+            # if not account.subscription_expires_at:
+            #     return Response(
+            #         {
+            #             "message": "You're not subscribed yet. Choose a plan to unlock messaging and start connecting with candidates."
+            #         },
+            #         status=403
+            #     )
 
-            if timezone.now() > account.subscription_expires_at:
-                return Response(
-                    {
-                        "message": "Your subscription has expired. Renew your plan to continue messaging and regain access to your chats."
-                    },
-                    status=403
-                )
+            # if timezone.now() > account.subscription_expires_at:
+            #     return Response(
+            #         {
+            #             "message": "Your subscription has expired. Renew your plan to continue messaging and regain access to your chats."
+            #         },
+            #         status=403
+            #     )
 
         except Company.DoesNotExist:
             return Response(
