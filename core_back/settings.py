@@ -242,3 +242,38 @@ LOGGING = {
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000
 FILE_UPLOAD_MAX_MEMORY_SIZE = 524288000
+
+CONVERGE_ACCOUNT_ID = os.environ.get(
+    "CONVERGE_ACCOUNT_ID",
+    "0022897" 
+)
+
+CONVERGE_USER_ID = os.environ.get(
+    "CONVERGE_USER_ID",
+    "apiuser" 
+)
+
+CONVERGE_PIN = os.environ.get(
+    "CONVERGE_PIN",
+    "PK22NMFYE8K880XPRHE2SJYSQ70R6J8V7CEZK60Q0TVM04UHSF0XS3IFS2UT6OUL"  #
+)
+
+CONVERGE_HPP_URL = os.environ.get(
+    "CONVERGE_HPP_URL",
+    "https://api.demo.convergepay.com/hosted-payments/transaction_token"
+)
+
+CONVERGE_XML_URL = os.environ.get(
+    "CONVERGE_XML_URL",
+    "https://api.demo.convergepay.com/VirtualMerchantDemo/processxml.do"
+)
+
+CONVERGE_POST_URL = os.environ.get(
+    "CONVERGE_POST_URL",
+    "https://api.demo.convergepay.com/hosted-payments/"
+)
+
+SUBSCRIPTION_BYPASS_ACCOUNT_IDS = [
+    27,
+    170,
+]
